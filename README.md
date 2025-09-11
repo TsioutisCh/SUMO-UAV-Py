@@ -1,81 +1,144 @@
 # SUMO-UAV-Py
 
-This project simulates UAV sensing, by integrating SUMO (Simulation of Urban MObility) traffic simulator.
+**SUMO-UAV-Py** is a plugin for simulating drone-based traffic sensing within the [SUMO](https://www.eclipse.dev/sumo/) (Simulation of Urban MObility) microscopic traffic simulator. It enables the generation of high-resolution aerial observations by integrating Unmanned Aerial Vehicle (UAV) dynamics, camera field-of-view modeling, and configurable flight paths into standard SUMO simulations. This tool is ideal for researchers working on UAV-based traffic state estimation, surveillance strategies, and aerial sensing validation under realistic traffic conditions.
 
-## Requirements
+## 🚀 Features
 
-- Python 3.7+ 
-- SUMO Eclipse
-- requirements.txt
+- Real-time UAV sensing in SUMO with no post-processing required
+- Multiple UAV flight behaviors: `Hovering`, `Sampling`, `Spinning`
+- 3D trajectory simulation using 5D waypoints (time, x, y, z, yaw)
+- Manual or script-based UAV paths
+- Battery constraints (optional)
+- GUI-based or JSON-based configuration
+- Modular architecture for integration with external planners
 
-## Configuration
+## 🛠 Requirements
 
-We can run the plugin using uav_gui_run.bat file in which a user interface for configuration or uav_run.bat file for a straightforward version. The simulation is configured using the GUI in uavpy_gui.py or in `config.json` file. 
-Below is an example configuration:
+- Python 3.7+
+- SUMO (Eclipse version)
+- Python dependencies listed in `requirements.txt`
+
+Install dependencies with:
+```bash
+pip install -r requirements.txt
+```
+
+## ⚙️ Configuration
+
+You can run the plugin in two ways:
+
+- **With GUI** via `uavpy_gui.py` (or the launcher: `uav_gui_run.bat`)
+- **Without GUI** using a config file directly (`uav_run.bat` or `main.py`)
+
+### Example `config.json`
 
 ```json
 {
     "Movement": "Continuous",
     "Remote Server": false,
     "Local GUI": false,
-    "Battery Mode":     true,                   // true to enable battery mode, false to disable
-    "Battery life(s)":  420,                    // Battery life in seconds (used if Uav Model is "Manual")
-    "fov_degrees":      [68, 40],               // Field of view degrees (used if Uav Model is "Manual")
-    "uav_speed":        15,                     // UAV speed in m/s (used if Uav Model is "Manual")
-    "yaw_speed":        5,                      // UAV yaw speed in degrees/s
-    "Gui Option":       true,                   // true to enable GUI, false to disable
-    "Uav Mode":         "Hovering",             // Options: "Hovering", "Spinning", "Sampling"
-    "Network file":     "NetworkFiles/
-                        <filename>.net.xml",    // Path to network file
-    "Sumocfg file":     "NetworkFiles/
-                        <filename>.sumocfg",    // Path to SUMO configuration file
-    "Step length(s)":   1,                      // Simulation step length in seconds
-    "Total time(s)":    1000,                   // Total simulation time in seconds
-    "Number of UAVs":   2,                      // Number of UAVs in the simulation
-    "uav_data":                                 // "Uav_Id": ["time-point","uav_x", "uav_y","uav_z","yaw_angle"]
-    {                                           // Keep id's order as it is. 
+    "Battery Mode": true,
+    "Battery life(s)": 420,
+    "fov_degrees": [68, 40],
+    "uav_speed": 15,
+    "yaw_speed": 5,
+    "Gui Option": true,
+    "Uav Mode": "Hovering",
+    "Network file": "NetworkFiles/<filename>.net.xml",
+    "Sumocfg file": "NetworkFiles/<filename>.sumocfg",
+    "Step length(s)": 1,
+    "Total time(s)": 1000,
+    "Number of UAVs": 2,
+    "uav_data": {
         "0": [
             [0, 1025, 1589, 0, 0], 
             [10, 1150, 1385, 300, 0],
             [100, 1150, 1585, 300, 0],
             [200, 750, 1585, 300, 0],
             [1080, 1025, 1589, 0, 0]
-        ],
-        // Additional UAV data...
+        ]
     }
 }
 ```
 
-## Usage
+Each UAV is defined by time-indexed 5D waypoints: `[time, x, y, z, yaw_angle]`.
 
-1. Ensure SUMO is installed and properly configured.
-2. Install the required Python packages:
-    ```bash
-    pip install -r requirements.txt
-    ```
-3. Directory Structure:
-    ```
-    /Simulation_folder
-    ├── config.json              # Configuration file for the simulation
-    ├── main.py                  # Main script to run the simulation
-    ├── utils.py                 # Utility functions and classes
-    ├── NetworkFiles
-    |   ├── network_file.xml     # Network file used by SUMO to define the simulation environment
-    |   └── sumo_config.sumocfg  # SUMO configuration file specifying the simulation setup         
-    ├── Outputs                  # Directory for output files
-    │   ├── uav_output.csv       # CSV file for UAV output data
-    |   └── external outputs     # sumo output data   
-    ├── images                   # Directory for image files
-    │   ├── manual.png           # Icon for manual UAV
-    │   ├── mini3pro.png         # Icon for Mini 3 Pro UAV
-    │   └── mavic2e.png          # Icon for Mavic 2E UAV
-    └── README.md                # This readme file
+## 📁 Directory Structure
 
-    ```
-4. Prepare your `config.json` file with the desired configuration.
-5. Run the gui:
-    ```bash
-    python uavpy_gui.py
-    ```
+```
+SUMO-UAV-Py/
+├── config.json               # Simulation configuration
+├── main.py                   # Headless simulation runner
+├── uavpy_gui.py              # GUI-based configuration launcher
+├── uav_gui_run.bat           # Windows GUI launcher
+├── uav_run.bat               # Windows headless launcher
+├── utils.py                  # Utility functions and internals
+├── requirements.txt
+│
+├── NetworkFiles/
+│   ├── <network_file>.net.xml
+│   └── <config_file>.sumocfg
+│
+├── Outputs/
+│   ├── uav_output.csv        # Real-time UAV logs
+│   └── external outputs/     # SUMO detector or tripinfo data
+│
+├── images/
+│   ├── manual.png
+│   ├── mini3pro.png
+│   └── mavic2e.png
+│
+└── README.md
+```
 
+## ▶️ Usage
 
+1. Ensure SUMO is installed and `SUMO_HOME` is properly set.
+2. Modify `config.json` to define UAV and simulation parameters.
+3. Launch the simulation:
+
+**Using the GUI:**
+```bash
+python uavpy_gui.py
+```
+
+**Without GUI:**
+```bash
+python main.py
+```
+
+## 📌 Notes
+
+- The plugin supports both **continuous motion** (rotate → move → rotate) and **discrete scripted motion**.
+- The FoV is rectangular and rotates with UAV yaw. Width and height scale with altitude.
+- Observations are stored in `uav_output.csv` and include vehicle IDs, positions, speeds, and UAV metadata.
+- If `Battery Mode` is enabled, UAVs will stop sensing once their battery life (in seconds) is exceeded.
+
+## 🧠 Use Cases
+
+- Microscopic UAV-based traffic sensing
+- Validation of drone trajectory planners
+- Scenario testing for emergency response using drones
+- Synthetic drone data generation for ML training
+
+## 📢 Acknowledgements
+
+This work was supported by the **European Research Council (ERC)** under the **European Union’s Horizon 2020 research and innovation programme** (Grant agreement No. 101043968 – URANUS).
+
+We gratefully acknowledge the URANUS project for its support in developing this plugin as part of a broader investigation into next-generation urban traffic monitoring systems using aerial sensing.
+
+## 📄 License
+
+Distributed under the [MIT License](LICENSE).
+
+## 📫 Contact
+
+For issues, questions, or feature requests, feel free to contact:
+
+tsioutis.charalambos@ucy.ac.cy
+
+## 📚 References
+
+If you use this plugin in your research, please cite:
+
+> Bieker, L., Erdmann, J., Krajzewicz, D. (2014). Traffic Simulation with SUMO – Simulation of Urban MObility. *[Conference Paper]*.
