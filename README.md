@@ -141,4 +141,6 @@ tsioutis.charalambos@ucy.ac.cy
 
 If you use this plugin in your research, please cite:
 
-> Bieker, L., Erdmann, J., Krajzewicz, D. (2014). Traffic Simulation with SUMO – Simulation of Urban MObility. *[Conference Paper]*.
+> Tsioutis, C., Makridis, C., & Timotheou, S. (2025). **SUAVPy: A SUMO Plugin for UAV-Based Ground Traffic Sensing**. *SUMO Conference Proceedings*, 6, 65–77. https://doi.org/10.52825/scp.v6i.2610
+
+> Bieker, L., Erdmann, J., & Krajzewicz, D. (2014). **Traffic Simulation with SUMO – Simulation of Urban MObility**. *SUMO User Conference 2014*.
