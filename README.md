@@ -1,3 +1,5 @@
+![Alt text](uranus.svg)  
+
 # SUMO-UAV-Py
 
 **SUMO-UAV-Py** is a plugin for simulating drone-based traffic sensing within the [SUMO](https://www.eclipse.dev/sumo/) (Simulation of Urban MObility) microscopic traffic simulator. It enables the generation of high-resolution aerial observations by integrating Unmanned Aerial Vehicle (UAV) dynamics, camera field-of-view modeling, and configurable flight paths into standard SUMO simulations. This tool is ideal for researchers working on UAV-based traffic state estimation, surveillance strategies, and aerial sensing validation under realistic traffic conditions.
