@@ -1,4 +1,12 @@
-![Alt text](uranus.svg)  
+<p align="center">
+  <img src="uranus.svg" alt="URANUS Project Logo" height="100">
+</p>
+
+<p align="center">
+  <b>Funded by the ERC project URANUS:</b><br>
+  <i>Real-Time Urban Mobility Management via Intelligent UAV-based Sensing</i>
+</p>
+
 
 # SUMO-UAV-Py
 
