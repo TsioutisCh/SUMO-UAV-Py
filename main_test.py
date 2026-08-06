@@ -9,7 +9,7 @@ import csv
 import time
 import traci 
 from functools import wraps
-from _utils import Calculations
+from utils import Calculations
 import os
 
 
@@ -238,52 +238,10 @@ class UAVSimulation:
         return uav_positions_list, time_list, uav_yaw_angles_list
 
     @timing_decorator
-    def calculate_yaw_angle(self, start, end):
-        direction = np.degrees(np.arctan2(end[1] - start[1], end[0] - start[0]))
-        return 90 - direction
-
-    @timing_decorator
-    def calculate_move_steps(self, start_pos, end_pos):
-        distance = np.linalg.norm(end_pos - start_pos)
-        return int(distance / (self.uav_speed * self.simulation_step_length))
-
-    @timing_decorator
-    def calculate_rotate_steps(self, yaw_difference):
-        return int(abs(yaw_difference) / self.yaw_speed)
-
-    @timing_decorator
-    def fov_calculation(self, fov_degrees, height):
-        a, b = fov_degrees
-        return np.array([height * np.tan(np.radians(a * 0.5)), height * np.tan(np.radians(b * 0.5))])
-
-    @timing_decorator
-    def calculate_fov_corners(self, uav_position, fov_size, yaw_angle):
-        uav_x, uav_y, _ = uav_position
-        L1, L2 = fov_size
-
-        corners = np.array([
-            [uav_x - L1 * 0.5, uav_y - L2 * 0.5],
-            [uav_x + L1 * 0.5, uav_y - L2 * 0.5],
-            [uav_x + L1 * 0.5, uav_y + L2 * 0.5],
-            [uav_x - L1 * 0.5, uav_y + L2 * 0.5]
-        ])
-
-        theta = np.radians(yaw_angle)
-        rotation_matrix = np.array([
-            [np.cos(theta), -np.sin(theta)],
-            [np.sin(theta), np.cos(theta)]
-        ])
-
-        rotated_corners = np.dot(corners - np.array([uav_x, uav_y]), rotation_matrix) + np.array([uav_x, uav_y])
-        points = [(x, y) for x, y in rotated_corners]
-
-        return points
-
-    @timing_decorator
     def get_vehicles_in_fov(self, vehicles, uav_position, fov_size, yaw_angle):
         vehicles_in_view = []
 
-        fov_corners = self.calculate_fov_corners(uav_position, fov_size, yaw_angle) 
+        fov_corners = self.calc.calculate_fov_corners(uav_position, fov_size, yaw_angle)
         fov_corners = np.array(fov_corners)
 
         min_x, max_x = np.min(fov_corners[:, 0]), np.max(fov_corners[:, 0])
@@ -313,7 +271,7 @@ class UAVSimulation:
                     index = self.time_list[uav_id].index(time)
                     uav_position = self.uav_positions_list[uav_id][index]
                     yaw_angle = self.uav_yaw_angles_list[uav_id][index]
-                    fov_size = self.fov_calculation(self.fov_degrees, uav_position[2])
+                    fov_size = self.calc.fov_calculation(self.fov_degrees, uav_position[2])
 
                     vehicles_in_fov = self.get_vehicles_in_fov(vehicles, uav_position, fov_size, yaw_angle)
                     for vehicle in vehicles_in_fov:

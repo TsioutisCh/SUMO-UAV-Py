@@ -25,12 +25,12 @@ def update_config_run():
         json.dump(config_data, f, indent=4)
     messagebox.showinfo("Info", "Configuration Applied Successfully")
 
-# Run the main_.py file in a separate thread (avoid blocking the main sim thread)
+# Run the main.py file in a separate thread (avoid blocking the main sim thread)
 def run_main_exp():
     global simulation_process
     #apply_changes()  # Apply changes before running
 
-    script_path = 'main_.py'  # Adjust the path if necessary
+    script_path = 'main.py'  # Adjust the path if necessary
     simulation_process = threading.Thread(target=subprocess.run, args=([sys.executable, script_path],)).start()
 
 # Change/update config.json
@@ -77,7 +77,10 @@ root.title("UAV Configuration")
 
 # Set the window icon
 icon_path = "images/kiosLogo.ico"  # Make sure the .ico file is in the correct path
-root.iconbitmap(icon_path)
+try:
+    root.iconbitmap(icon_path)
+except tk.TclError:
+    pass  # .ico icons are only supported on Windows
 
 # Set the window size and make it non-resizable
 root.geometry("400x700")
