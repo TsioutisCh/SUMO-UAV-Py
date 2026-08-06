@@ -15,26 +15,18 @@ with open(config_file_path, 'r') as f:
 simulation_process = None
 
 # Update config.json
-def update_config():
+def update_config(show_confirmation=True):
     with open(config_file_path, 'w') as f:
         json.dump(config_data, f, indent=4)
-    messagebox.showinfo("Info", "Configuration Applied Successfully")
+    if show_confirmation:
+        messagebox.showinfo("Info", "Configuration Applied Successfully")
 
-def update_config_run():
-    with open(config_file_path, 'w') as f:
-        json.dump(config_data, f, indent=4)
-    messagebox.showinfo("Info", "Configuration Applied Successfully")
-
-# Run the main.py file in a separate thread (avoid blocking the main sim thread)
-def run_main_exp():
-    global simulation_process
-    #apply_changes()  # Apply changes before running
-
-    script_path = 'main.py'  # Adjust the path if necessary
-    simulation_process = threading.Thread(target=subprocess.run, args=([sys.executable, script_path],)).start()
-
-# Change/update config.json
-def apply_changes():
+# Read every GUI field and validate it against config_data's existing type
+# for that key. Returns (new_values, errors) without touching config_data -
+# callers decide what to do once they know whether validation passed.
+def _collect_entry_values():
+    new_values = {}
+    errors = []
     for key, entry in entries.items():
         if isinstance(entry, ttk.Combobox):
             value = entry.get()
@@ -42,17 +34,57 @@ def apply_changes():
             value = bool(entry.get())
         else:
             value = entry.get()
-        if key in config_data:
-            if isinstance(config_data[key], list):
-                config_data[key] = list(map(float, value.split(',')))
-            elif isinstance(config_data[key], bool):
-                config_data[key] = value
-            elif isinstance(config_data[key], int):
-                config_data[key] = int(value)
-            elif isinstance(config_data[key], float):
-                config_data[key] = float(value)
+
+        if key not in config_data:
+            continue
+
+        current = config_data[key]
+        try:
+            if isinstance(current, list):
+                new_values[key] = list(map(float, value.split(',')))
+            elif isinstance(current, bool):
+                new_values[key] = value
+            elif isinstance(current, int):
+                new_values[key] = int(value)
+            elif isinstance(current, float):
+                new_values[key] = float(value)
             else:
-                config_data[key] = value
+                new_values[key] = value
+        except ValueError:
+            errors.append(f"{key}: '{value}' is not a valid value")
+
+    return new_values, errors
+
+# Run the main.py file in a separate thread (avoid blocking the main sim thread)
+def run_main_exp():
+    global simulation_process
+
+    new_values, errors = _collect_entry_values()
+    if errors:
+        messagebox.showerror(
+            "Invalid Input",
+            "Please fix the following field(s) before running:\n\n" + "\n".join(errors)
+        )
+        return
+
+    # Always apply pending edits before running, so Run never launches a
+    # stale config just because Apply wasn't clicked first.
+    config_data.update(new_values)
+    update_config(show_confirmation=False)
+
+    script_path = 'main.py'  # Adjust the path if necessary
+    simulation_process = threading.Thread(target=subprocess.run, args=([sys.executable, script_path],)).start()
+
+# Change/update config.json
+def apply_changes():
+    new_values, errors = _collect_entry_values()
+    if errors:
+        messagebox.showerror(
+            "Invalid Input",
+            "Please fix the following field(s):\n\n" + "\n".join(errors)
+        )
+        return
+    config_data.update(new_values)
     update_config()
 
 # Close pop-upstop SUMO
