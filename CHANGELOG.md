@@ -24,3 +24,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `.gitignore` for generated simulation outputs, Python caches, and editor/OS files.
 - `CONTRIBUTING.md` with dev setup and PR workflow.
 - License / Python-version / repo-activity badges on the README.
+- `tests/` — a `pytest` suite covering `utils.Calculations` (UAV kinematics, FOV geometry) and the new config loader (28 tests). Runs without a SUMO installation.
+- `config.py` — shared, validated config loading used by both `main.py` and `main_test.py`, replacing ~60 lines of duplicated `read_config` logic in each. Missing/invalid fields now raise a clear `ConfigError` (e.g. "missing required field(s): Uav Model") instead of a bare `KeyError` or `FileNotFoundError` from deep inside the class.
+- `.github/workflows/ci.yml` — runs `ruff check` and `pytest` on every push/PR to `main`, across Python 3.9/3.11/3.12.
+- `pyproject.toml` — the project is now `pip install`-able (`pip install -e ".[dev]"` for a dev setup with test/lint tooling).
+
+### Fixed
+- Removed an unused `import time` in `client.py` (caught by `ruff`).

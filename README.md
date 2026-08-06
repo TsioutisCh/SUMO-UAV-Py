@@ -8,6 +8,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/TsioutisCh/SUMO-UAV-Py/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/TsioutisCh/SUMO-UAV-Py/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <img alt="Python 3.7+" src="https://img.shields.io/badge/python-3.7%2B-blue.svg">
   <a href="https://github.com/TsioutisCh/SUMO-UAV-Py/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/TsioutisCh/SUMO-UAV-Py"></a>
