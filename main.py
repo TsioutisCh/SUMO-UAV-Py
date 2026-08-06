@@ -8,10 +8,10 @@ import csv
 import numpy as np
 import ujson as json
 import socket
-import os
 import tkinter as tk
 from tkinter import messagebox, ttk, Toplevel, Label
 from utils import Calculations
+from config import load_uav_config
 
 
 def non_blocking_warning(title, message):
@@ -115,67 +115,31 @@ class UAVSimulation:
         self.uav_positions_list, self.time_list, self.uav_yaw_angles_list = self.uav_path_data()
 
     def read_config(self, config_file):
-        try:
-            with open(config_file, 'r') as file:
-                config = json.load(file)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Configuration file {config_file} not found.")
-        except json.JSONDecodeError:
-            raise ValueError("Configuration file is not a valid JSON.")
-        
-        self.UavModel = config['Uav Model']
-        self.GuiOption = config['GUI Option']
-        self.battery_mode = config.get('Battery Mode', False)
-        self.num_UAVs = config['Number of UAVs']
-        self.UavMode = config.get('Uav Mode', 'Hovering')
-        
-        self.mode = config.get('Input Mode', 'Offline')
-        self.movement = config.get('Movement', 'Continuous')
-        
-        self.server_option = config.get('Remote Server', False)
-        self.local_gui = config.get('Local GUI', False)
-        
-        self.delay_option = config.get('Delay', 0 )
-        
-        self.simulation_step_length = float(config['Step length (s)'])
-        self.total_simulation_steps = int(config['Total time (s)'] / self.simulation_step_length)
-        
-        if self.UavModel == 'Mavic 2e':
-            self.fov_degrees = [68.0643, 40.0455]
-            self.uav_speed = 13.8
-            self.yaw_speed = 10
-            self.battery_life = int(1500 / self.simulation_step_length) # 25 minutes 
-        elif self.UavModel == 'Mini 3 pro':
-            self.fov_degrees = [66.9161, 40.2499]
-            self.uav_speed = 10
-            self.yaw_speed = 10
-            self.battery_life = int(1800 / self.simulation_step_length) # 30 minutes 
-        elif self.UavModel == 'Manual':
-            self.fov_degrees = list(map(float, config['FOV (deg)']))
-            self.uav_speed = float(config['UAV Speed'])
-            self.yaw_speed = float(config['Yaw Speed'])
-            self.battery_life = int(config.get('Battery life (s)',1800)/self.simulation_step_length) # 30 minutes if not stated 
-        else:
-            raise ValueError('UAV model does not exist')
+        cfg = load_uav_config(config_file)
 
-        self.network_file = config['Network file']
-        self.sumocfg_file = config['Sumocfg file']
-        
-        if not os.path.exists(self.sumocfg_file):
-            raise FileNotFoundError(f"SUMO configuration file {self.sumocfg_file} not found.")
-        if not os.path.exists(self.network_file):
-            raise FileNotFoundError(f"SUMO configuration file {self.network_file} not found.")
-    
-        self.uav_data = config['uav_data']
-        
-        if self.server_option:
-            self.uav_data = {str(i): [[0] * 5] for i in range(self.num_UAVs)}
-            
-        
+        self.UavModel = cfg['UavModel']
+        self.GuiOption = cfg['GuiOption']
+        self.battery_mode = cfg['battery_mode']
+        self.num_UAVs = cfg['num_UAVs']
+        self.UavMode = cfg['UavMode']
+        self.mode = cfg['mode']
+        self.movement = cfg['movement']
+        self.server_option = cfg['server_option']
+        self.local_gui = cfg['local_gui']
+        self.delay_option = cfg['delay_option']
+        self.simulation_step_length = cfg['simulation_step_length']
+        self.total_simulation_steps = cfg['total_simulation_steps']
+        self.fov_degrees = cfg['fov_degrees']
+        self.uav_speed = cfg['uav_speed']
+        self.yaw_speed = cfg['yaw_speed']
+        self.battery_life = cfg['battery_life']
+        self.network_file = cfg['network_file']
+        self.sumocfg_file = cfg['sumocfg_file']
+        self.uav_data = cfg['uav_data']
+
         print(f' Number of Uavs: {self.num_UAVs} \n Uav Model: {self.UavModel} \n Uav Speed: {self.uav_speed} m/s \n Yaw Speed: {self.yaw_speed} \n Battery Life: {self.battery_life/60*self.simulation_step_length} minutes ')
-    
 
-        
+
     def start_sumo(self):         
         sumo_cmd = ['sumo-gui' if self.GuiOption else 'sumo', "-c", 
                     self.sumocfg_file, 
