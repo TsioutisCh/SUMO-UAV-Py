@@ -11,7 +11,7 @@ import socket
 import os
 import tkinter as tk
 from tkinter import messagebox, ttk, Toplevel, Label
-from _utils import Calculations
+from utils import Calculations
 
 import time 
 
