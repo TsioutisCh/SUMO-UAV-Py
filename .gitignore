@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Simulation outputs (regenerated on every run, not source)
+Outputs/*.csv
+Outputs/*.xml
+BolognaScenario/sumo_log.txt
+BolognaScenario/tripinfos.xml
+BolognaScenario/e1_output.xml
+*.out.xml
