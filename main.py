@@ -2,6 +2,7 @@
 Main code of SUAVPy
 """
 
+import re
 import threading
 import traci
 import csv
@@ -12,6 +13,10 @@ import tkinter as tk
 from tkinter import messagebox, ttk, Toplevel, Label
 from utils import Calculations
 from config import load_uav_config
+
+# Matches the (possibly negative, possibly decimal) numbers in a copied
+# SUMO-GUI cursor position, e.g. "1234.56,789.01" or "x=1234.56, y=789.01".
+_COORD_PATTERN = re.compile(r'-?\d+\.?\d*')
 
 
 def non_blocking_warning(title, message):
@@ -35,9 +40,9 @@ def non_blocking_warning(title, message):
 
 def get_uav_position_input():
     root = tk.Tk()
-    
+
     root.title("Local GUI")
-    
+
     root.withdraw()
 
     # Set the window icon
@@ -46,7 +51,7 @@ def get_uav_position_input():
         root.iconbitmap(icon_path)
     except tk.TclError:
         pass  # .ico icons are only supported on Windows
-    
+
     root.geometry("400x250")
     #root.resizable(False, False)
 
@@ -68,41 +73,94 @@ def get_uav_position_input():
         dialog.iconbitmap(icon_path)
     except tk.TclError:
         pass  # .ico icons are only supported on Windows
-    
+
     dialog.attributes("-topmost", True)
 
-    # UAV ID input
-    uav_id_label = tk.Label(dialog, text="Enter UAV ID:", bg='#2E2E2E', fg='#FFFFFF', font=('Helvetica', 11))
-    uav_id_label.grid(row=0, column=0, sticky='nsew', padx=5, pady=5)  # Centered with 'nsew' sticky option
-    uav_id_entry = tk.Entry(dialog, bg='#3C3F41', fg='#FFFFFF', insertbackground='#FFFFFF', font=('Helvetica', 11))
-    uav_id_entry.grid(row=0, column=1, padx=5, pady=5)
+    def add_field(row, label_text):
+        label = tk.Label(dialog, text=label_text, bg='#2E2E2E', fg='#FFFFFF', font=('Helvetica', 11))
+        label.grid(row=row, column=0, sticky='w', padx=5, pady=5)
+        entry = tk.Entry(dialog, bg='#3C3F41', fg='#FFFFFF', insertbackground='#FFFFFF', font=('Helvetica', 11), width=16)
+        entry.grid(row=row, column=1, padx=5, pady=5)
+        return entry
 
-    # UAV position input
-    position_label = tk.Label(dialog, text="Enter UAV position as \n (t, x, y, z, φ):", bg='#2E2E2E', fg='#FFFFFF', font=('Arimo', 11))
-    position_label.grid(row=1, column=0, sticky='nsew', padx=5, pady=5)  # Centered with 'nsew' sticky option
-    position_entry = tk.Entry(dialog, bg='#3C3F41', fg='#FFFFFF', insertbackground='#FFFFFF', font=('Helvetica', 11))
-    position_entry.grid(row=1, column=1, padx=5, pady=5)
+    uav_id_entry = add_field(0, "UAV ID:")
+    time_entry = add_field(1, "Time (s):")
+    x_entry = add_field(2, "X:")
+    y_entry = add_field(3, "Y:")
+    z_entry = add_field(4, "Z / altitude:")
+    yaw_entry = add_field(5, "Yaw (deg):")
+
+    error_label = tk.Label(
+        dialog, text="", bg='#2E2E2E', fg='#FF6B6B', font=('Helvetica', 9),
+        wraplength=360, justify='left'
+    )
+    error_label.grid(row=6, column=0, columnspan=2, sticky='w', padx=5)
+
+    def paste_position():
+        try:
+            clipboard_text = dialog.clipboard_get()
+        except tk.TclError:
+            error_label.config(text="Clipboard is empty or unavailable.")
+            return
+        numbers = _COORD_PATTERN.findall(clipboard_text)
+        if len(numbers) < 2:
+            error_label.config(
+                text="Couldn't find an X,Y pair in the clipboard "
+                     f"('{clipboard_text.strip()}'). In sumo-gui, right-click "
+                     "the map and choose 'Copy cursor position' first."
+            )
+            return
+        x_entry.delete(0, tk.END)
+        x_entry.insert(0, numbers[0])
+        y_entry.delete(0, tk.END)
+        y_entry.insert(0, numbers[1])
+        error_label.config(text="")
+
+    paste_button = tk.Button(
+        dialog, text="Paste X, Y from clipboard", command=paste_position,
+        bg='#3C3F41', fg='#FFFFFF', activebackground='#4CAF50', font=('Helvetica', 10)
+    )
+    paste_button.grid(row=7, column=0, columnspan=2, pady=(0, 5))
+
+    result = {}
+
+    def submit():
+        try:
+            t = float(time_entry.get())
+            x = float(x_entry.get())
+            y = float(y_entry.get())
+            z = float(z_entry.get())
+            yaw = float(yaw_entry.get())
+        except ValueError:
+            error_label.config(text="Time, X, Y, Z and Yaw must all be numbers.")
+            return
+        result['uav_id'] = uav_id_entry.get()
+        result['position'] = json.dumps([t, x, y, z, yaw])
+        root.quit()
+
+    def do_break():
+        result['uav_id'] = 'break'
+        result['position'] = ''
+        root.quit()
 
     # Button frame
     button_frame = tk.Frame(dialog, bg='#2E2E2E')
-    button_frame.grid(row=2, columnspan=2, pady=20)
+    button_frame.grid(row=8, column=0, columnspan=2, pady=15)
 
     # Submit button (green)
-    submit_button = tk.Button(button_frame, text="Submit", bg='#4CAF50', fg='#FFFFFF', activebackground='#45A049', font=('Helvetica', 11), command=root.quit)
+    submit_button = tk.Button(button_frame, text="Submit", bg='#4CAF50', fg='#FFFFFF', activebackground='#45A049', font=('Helvetica', 11), command=submit)
     submit_button.grid(row=0, column=0, padx=10)
 
     # Break button (red) that sends 'break'
-    break_button = tk.Button(button_frame, text="Break", bg='#F44336', fg='#FFFFFF', activebackground='#E57373', font=('Helvetica', 11), command=lambda: (uav_id_entry.insert(0, "break"), root.quit()))
+    break_button = tk.Button(button_frame, text="Break", bg='#F44336', fg='#FFFFFF', activebackground='#E57373', font=('Helvetica', 11), command=do_break)
     break_button.grid(row=0, column=1, padx=10)
 
-    
     root.mainloop()
-
-    uav_id_value = uav_id_entry.get()
-    position_value = position_entry.get()
-
     root.destroy()
-    return uav_id_value, position_value
+
+    # If the window was closed without Submit/Break, treat it as Break
+    # rather than leaving the caller with no result at all.
+    return result.get('uav_id', 'break'), result.get('position', '')
 
 
 class UAVSimulation:
