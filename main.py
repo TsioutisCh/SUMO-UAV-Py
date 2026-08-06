@@ -13,8 +13,6 @@ import tkinter as tk
 from tkinter import messagebox, ttk, Toplevel, Label
 from utils import Calculations
 
-import time 
-
 
 def non_blocking_warning(title, message):
     warning_window = Toplevel()
@@ -22,7 +20,10 @@ def non_blocking_warning(title, message):
     warning_window.geometry("300x80")
     warning_window.configure(bg='#2E2E2E')
     icon_path = "images/kiosLogo.ico"
-    warning_window.iconbitmap(icon_path)
+    try:
+        warning_window.iconbitmap(icon_path)
+    except tk.TclError:
+        pass  # .ico icons are only supported on Windows
     
     
     label = Label(warning_window, text=message, bg='#2E2E2E', bd =5, fg='#FFFFFF', font=('Helvetica', 10))
@@ -41,7 +42,10 @@ def get_uav_position_input():
 
     # Set the window icon
     icon_path = "images/kiosLogo.ico"
-    root.iconbitmap(icon_path)
+    try:
+        root.iconbitmap(icon_path)
+    except tk.TclError:
+        pass  # .ico icons are only supported on Windows
     
     root.geometry("400x250")
     #root.resizable(False, False)
@@ -60,7 +64,10 @@ def get_uav_position_input():
     # Create a dialog window for input
     dialog = tk.Toplevel(root)
     dialog.configure(bg='#2E2E2E')
-    dialog.iconbitmap(icon_path)
+    try:
+        dialog.iconbitmap(icon_path)
+    except tk.TclError:
+        pass  # .ico icons are only supported on Windows
     
     dialog.attributes("-topmost", True)
 
@@ -549,27 +556,3 @@ if __name__ == "__main__":
 
     # Exit the program once everything is done
     print("Simulation and UI closed.")
-
-#######
-#######
-#######
-
-# if __name__ == "__main__":
-    
-#     sim = UAVSimulation('config.json')
-    
-#     try:
-#          t0 = time.time()
-#          sim.start_sumo()
-#          sim.run_simulation()
-#          t1 = time.time()
-#          print(f"Elapsed time: {t1 - t0} seconds")
-#     except traci.exceptions.TraCIException:
-#          traci.close()
-#          print("TraCI is fully closed from exception")
-
-#######
-#######
-#######
-        
-

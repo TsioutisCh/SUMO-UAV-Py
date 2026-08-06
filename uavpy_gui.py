@@ -77,7 +77,10 @@ root.title("UAV Configuration")
 
 # Set the window icon
 icon_path = "images/kiosLogo.ico"  # Make sure the .ico file is in the correct path
-root.iconbitmap(icon_path)
+try:
+    root.iconbitmap(icon_path)
+except tk.TclError:
+    pass  # .ico icons are only supported on Windows
 
 # Set the window size and make it non-resizable
 root.geometry("400x700")
