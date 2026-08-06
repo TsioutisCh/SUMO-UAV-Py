@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sumo-uav-py"
+version = "0.1.0"
+description = "SUMO plugin for simulating drone-based traffic sensing: UAV flight paths, camera field-of-view modeling, and TraCI integration."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.7"
+authors = [
+    { name = "Charalambos Tsioutis", email = "tsioutis.charalambos@ucy.ac.cy" },
+]
+dependencies = [
+    "numpy>=1.21",
+    "pandas>=1.3",
+    "matplotlib>=3.4",
+    "shapely>=1.8",
+    "ujson>=5.0",
+    "traci",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "ruff>=0.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/TsioutisCh/SUMO-UAV-Py"
+
+[tool.setuptools]
+py-modules = ["main", "main_test", "utils", "config", "client"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+# Kept deliberately narrow: real errors (E9) and pyflakes (F - unused
+# imports/variables, undefined names). Style/formatting rules are left
+# off so CI doesn't fail on unrelated pre-existing formatting.
+select = ["E9", "F"]
