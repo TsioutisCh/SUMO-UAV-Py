@@ -28,6 +28,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `config.py` — shared, validated config loading used by both `main.py` and `main_test.py`, replacing ~60 lines of duplicated `read_config` logic in each. Missing/invalid fields now raise a clear `ConfigError` (e.g. "missing required field(s): Uav Model") instead of a bare `KeyError` or `FileNotFoundError` from deep inside the class.
 - `.github/workflows/ci.yml` — runs `ruff check` and `pytest` on every push/PR to `main`, across Python 3.9/3.11/3.12.
 - `pyproject.toml` — the project is now `pip install`-able (`pip install -e ".[dev]"` for a dev setup with test/lint tooling).
+- "Paste X, Y from clipboard" in the in-run UAV position popup (`Local GUI` mode): copy a position in sumo-gui via right-click → *Copy cursor position*, then paste it straight into the popup instead of typing coordinates by hand. The popup also now uses five separate Time/X/Y/Z/Yaw fields instead of one hand-typed JSON tuple.
 
 ### Fixed
 - Removed an unused `import time` in `client.py` (caught by `ruff`).
