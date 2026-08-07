@@ -409,15 +409,25 @@ class UAVSimulation:
         # Check if local GUI is true and modify the path accordingly
         if self.local_gui:
             if str(uav_id) in self.uav_data:
-                # Find the index of the next waypoint to be executed
-                next_index = next((idx for idx, point in enumerate(self.uav_data[str(uav_id)]) if point[0] > time), None)
-                
+                waypoints = self.uav_data[str(uav_id)]
+
+                # Find the index of the next waypoint to be executed. If the
+                # new waypoint's time is at or after every existing one (the
+                # common case - you're usually scheduling something for
+                # "now" or soon), there is no such waypoint; insert at the
+                # end instead of leaving next_index as None, which list.insert
+                # can't use as a position.
+                next_index = next(
+                    (idx for idx, point in enumerate(waypoints) if point[0] > time),
+                    len(waypoints)
+                )
+
                 # Insert the new waypoint
-                self.uav_data[str(uav_id)].insert(next_index, [time, x, y, z, yaw_angle])
-                
-                # Remove the next waypoint in the sequence
-                if next_index is not None and len(self.uav_data[str(uav_id)]) > next_index + 1:
-                    self.uav_data[str(uav_id)].pop(next_index + 1)
+                waypoints.insert(next_index, [time, x, y, z, yaw_angle])
+
+                # Remove the next waypoint in the sequence, if there was one
+                if len(waypoints) > next_index + 1:
+                    waypoints.pop(next_index + 1)
     
         # Otherwise, proceed as before
         else:
