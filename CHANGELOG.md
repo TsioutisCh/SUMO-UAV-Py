@@ -32,3 +32,4 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 - Removed an unused `import time` in `client.py` (caught by `ruff`).
+- `update_uav_path()` crashed (`TypeError: 'NoneType' object cannot be interpreted as an integer`) whenever a new UAV waypoint was scheduled at or after every existing waypoint's time — the normal case for a live "update position now" edit. Pre-existing bug, independent of the paste-position feature above; it just took actually exercising that code path to surface it.
