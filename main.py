@@ -38,7 +38,7 @@ def non_blocking_warning(title, message):
     warning_window.attributes("-topmost", True) 
     
 
-def get_uav_position_input():
+def get_uav_position_input(current_time=None):
     root = tk.Tk()
 
     root.title("Local GUI")
@@ -84,11 +84,17 @@ def get_uav_position_input():
         return entry
 
     uav_id_entry = add_field(0, "UAV ID:")
-    time_entry = add_field(1, "Time (s):")
+    time_entry = add_field(1, "Time (s) — blank = now:")
     x_entry = add_field(2, "X:")
     y_entry = add_field(3, "Y:")
     z_entry = add_field(4, "Z / altitude:")
     yaw_entry = add_field(5, "Yaw (deg):")
+
+    # Pre-fill with the current simulation time so it's visible as the
+    # default; leaving it blank (or clearing it) at Submit falls back to
+    # whatever the simulation time is at that moment.
+    if current_time is not None:
+        time_entry.insert(0, f"{current_time:.2f}")
 
     error_label = tk.Label(
         dialog, text="", bg='#2E2E2E', fg='#FF6B6B', font=('Helvetica', 9),
@@ -125,14 +131,25 @@ def get_uav_position_input():
     result = {}
 
     def submit():
+        time_text = time_entry.get().strip()
+        if not time_text:
+            if current_time is None:
+                error_label.config(text="Time is required (no current simulation time is available).")
+                return
+            t = current_time
+        else:
+            try:
+                t = float(time_text)
+            except ValueError:
+                error_label.config(text="Time must be a number (or blank to use the current simulation time).")
+                return
         try:
-            t = float(time_entry.get())
             x = float(x_entry.get())
             y = float(y_entry.get())
             z = float(z_entry.get())
             yaw = float(yaw_entry.get())
         except ValueError:
-            error_label.config(text="Time, X, Y, Z and Yaw must all be numbers.")
+            error_label.config(text="X, Y, Z and Yaw must all be numbers.")
             return
         result['uav_id'] = uav_id_entry.get()
         result['position'] = json.dumps([t, x, y, z, yaw])
@@ -169,6 +186,7 @@ class UAVSimulation:
         self.read_config(config_file)
         self.timing_data = {}
         self.stop_flag = False
+        self.current_step = 0
         self.calc = Calculations(self.uav_speed, self.simulation_step_length, self.yaw_speed)
         self.uav_positions_list, self.time_list, self.uav_yaw_angles_list = self.uav_path_data()
 
@@ -251,7 +269,8 @@ class UAVSimulation:
                 
                 traci.simulationStep()
                 step += 1
-    
+                self.current_step = step
+
                 for veh_id in traci.simulation.getDepartedIDList():
                     traci.vehicle.subscribe(veh_id, [traci.constants.VAR_POSITION, traci.constants.VAR_SPEED])
                 subscribed_data = traci.vehicle.getAllSubscriptionResults()
@@ -380,7 +399,8 @@ class UAVSimulation:
     
     def get_user_input(self):
         while not self.stop_flag:
-            uav_id, position_str = get_uav_position_input()
+            current_time = self.current_step * self.simulation_step_length
+            uav_id, position_str = get_uav_position_input(current_time)
     
             # Check if the break button was pressed
             if uav_id.strip().lower() == 'break':
