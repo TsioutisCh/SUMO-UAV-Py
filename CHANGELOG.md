@@ -29,6 +29,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `.github/workflows/ci.yml` — runs `ruff check` and `pytest` on every push/PR to `main`, across Python 3.9/3.11/3.12.
 - `pyproject.toml` — the project is now `pip install`-able (`pip install -e ".[dev]"` for a dev setup with test/lint tooling).
 - "Paste X, Y from clipboard" in the in-run UAV position popup (`Local GUI` mode): copy a position in sumo-gui via right-click → *Copy cursor position*, then paste it straight into the popup instead of typing coordinates by hand. The popup also now uses five separate Time/X/Y/Z/Yaw fields instead of one hand-typed JSON tuple.
+- The popup's Time field is now pre-filled with the current simulation time and falls back to it if left blank — leaving it empty means "start moving from now," instead of requiring you to know and type the exact current simulation time in seconds.
 
 ### Fixed
 - Removed an unused `import time` in `client.py` (caught by `ruff`).
