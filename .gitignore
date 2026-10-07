@@ -23,3 +23,5 @@ BolognaScenario/sumo_log.txt
 BolognaScenario/tripinfos.xml
 BolognaScenario/e1_output.xml
 *.out.xml
+plans/*
+!plans/ANCHORS.md
