@@ -198,7 +198,6 @@ class UAVSimulation:
         self.battery_mode = cfg['battery_mode']
         self.num_UAVs = cfg['num_UAVs']
         self.UavMode = cfg['UavMode']
-        self.mode = cfg['mode']
         self.movement = cfg['movement']
         self.server_option = cfg['server_option']
         self.local_gui = cfg['local_gui']
@@ -321,7 +320,7 @@ class UAVSimulation:
                             if self.GuiOption:
                                 if polygon_exists[uav_id] and update_required:
                                     self.calc.update_fov_polygon(uav_position, field_of_view_size, yaw_angle, polygon_ids[uav_id], border_polygon_ids[uav_id])
-                                if step % 1 == 0 and poi_exists[uav_id] and update_required: ## PERFORMANCE CHECK ##
+                                if poi_exists[uav_id] and update_required:
                                     self.calc.update_poi(poi_ids[uav_id], uav_position, yaw_angle)
     
                             if self.UavMode == 'Sampling':

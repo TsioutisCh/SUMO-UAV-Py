@@ -52,7 +52,6 @@ class UAVSimulation:
         self.battery_mode = cfg['battery_mode']
         self.num_UAVs = cfg['num_UAVs']
         self.UavMode = cfg['UavMode']
-        self.mode = cfg['mode']
         self.movement = cfg['movement']
         self.server_option = cfg['server_option']
         self.local_gui = cfg['local_gui']

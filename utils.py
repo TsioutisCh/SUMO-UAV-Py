@@ -42,12 +42,6 @@ class Calculations:
         distance = np.linalg.norm(end_pos - start_pos)
         return int(distance / (self.uav_speed * self.simulation_step_length))
     
-    # @timing_decorator
-    # def calculate_rotate_steps_(self, yaw_difference):
-    #     yaw_difference = (yaw_difference + 360) % 360  # to choose the correct rotation angle
-    #     yaw_difference = abs(yaw_difference)
-    #     return int((yaw_difference / (self.yaw_speed * self.simulation_step_length)))  
-    
     @timing_decorator
     def calculate_rotate_steps(self, yaw_difference):
         # Normalize the yaw difference to the minimal angle [0, 180]
