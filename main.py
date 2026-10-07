@@ -3,6 +3,7 @@ Main code of SUAVPy
 """
 
 import re
+import sys
 import threading
 import traci
 import csv
@@ -12,7 +13,7 @@ import socket
 import tkinter as tk
 from tkinter import messagebox, ttk, Toplevel, Label
 from utils import Calculations
-from config import load_uav_config
+from config import ConfigError, load_uav_config
 
 # Matches the (possibly negative, possibly decimal) numbers in a copied
 # SUMO-GUI cursor position, e.g. "1234.56,789.01" or "x=1234.56, y=789.01".
@@ -579,6 +580,9 @@ def start_simulation_thread(sim, tk_root):
         sim.run_simulation()
     except traci.exceptions.FatalTraCIError:
         print("Simulation terminated due to SUMO closing.")
+    except FileNotFoundError:
+        print("Could not start SUMO: 'sumo'/'sumo-gui' was not found on PATH. "
+              "Make sure SUMO is installed and SUMO_HOME/bin is on PATH.")
     finally:
         try:
             traci.close()
@@ -593,7 +597,11 @@ if __name__ == "__main__":
     root.withdraw()  # Hide the main window since we don't need it
 
     # Initialize the simulation
-    sim = UAVSimulation('config.json')
+    try:
+        sim = UAVSimulation('config.json')
+    except ConfigError as e:
+        print(f"Configuration error: {e}")
+        sys.exit(1)
 
     # Start the simulation in a separate thread so it doesn't block the Tkinter event loop
     simulation_thread = threading.Thread(target=start_simulation_thread, args=(sim, root))

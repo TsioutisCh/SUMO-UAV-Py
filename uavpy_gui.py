@@ -2,14 +2,21 @@ import tkinter as tk
 from tkinter import messagebox, filedialog
 from tkinter import ttk
 import json
+import shutil
 import subprocess
 import sys
 import threading
 
+from config import ConfigError, load_uav_config
+
 # Load config.json
 config_file_path = 'config.json'  # Adjust the path if necessary
-with open(config_file_path, 'r') as f:
-    config_data = json.load(f)
+try:
+    with open(config_file_path, 'r') as f:
+        config_data = json.load(f)
+except (FileNotFoundError, ValueError) as e:
+    messagebox.showerror("Startup Error", f"Could not load {config_file_path}:\n\n{e}")
+    sys.exit(1)
 
 # Track the running simulation process or thread
 simulation_process = None
@@ -71,6 +78,24 @@ def run_main_exp():
     # stale config just because Apply wasn't clicked first.
     config_data.update(new_values)
     update_config(show_confirmation=False)
+
+    # Preflight: validate the config we just saved and make sure the right
+    # SUMO executable is on PATH, so a bad config/missing install shows a
+    # clear message here instead of failing invisibly inside the subprocess.
+    try:
+        cfg = load_uav_config(config_file_path)
+    except ConfigError as e:
+        messagebox.showerror("Invalid Configuration", str(e))
+        return
+
+    sumo_executable = 'sumo-gui' if cfg['GuiOption'] else 'sumo'
+    if shutil.which(sumo_executable) is None:
+        messagebox.showerror(
+            "SUMO Not Found",
+            f"Could not find '{sumo_executable}' on your PATH.\n\n"
+            "Make sure SUMO is installed and SUMO_HOME/bin is on PATH."
+        )
+        return
 
     script_path = 'main.py'  # Adjust the path if necessary
     simulation_process = threading.Thread(target=subprocess.run, args=([sys.executable, script_path],)).start()
