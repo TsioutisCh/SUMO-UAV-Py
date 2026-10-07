@@ -154,8 +154,12 @@ class UAVSimulation:
                             total_steps += 1                        
                         
                         for step in range(rotate_to_target_steps):
+                            # DECISION plan-2026-10-07T075432-0e92718c/D-001: append next_pos, not init_pos.
+                            # The move loop just above already relocated the UAV to next_pos; this loop only
+                            # rotates its yaw in place. Appending init_pos here silently snapped logged
+                            # positions back to the start of the move (see tests/test_path_parity.py).
                             yaw = current_yaw_angle + (target_yaw_angle - current_yaw_angle) * (step + 1) / rotate_to_target_steps
-                            uav_positions.append(init_pos)
+                            uav_positions.append(next_pos)
                             step_times.append(total_steps)
                             uav_yaw_angles.append(yaw)
                             total_steps += 1
