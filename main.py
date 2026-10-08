@@ -3,6 +3,7 @@ Main code of SUAVPy
 """
 
 import re
+import shutil
 import sys
 import threading
 import traci
@@ -11,6 +12,7 @@ import numpy as np
 import ujson as json
 import socket
 import tkinter as tk
+from datetime import datetime
 from tkinter import messagebox, ttk, Toplevel, Label
 from utils import Calculations
 from config import ConfigError, load_uav_config
@@ -184,6 +186,7 @@ def get_uav_position_input(current_time=None):
 class UAVSimulation:
 
     def __init__(self, config_file):
+        self.config_file = config_file
         self.read_config(config_file)
         self.timing_data = {}
         self.stop_flag = False
@@ -235,8 +238,18 @@ class UAVSimulation:
             #traci.gui.setOffset("View #0", 1900, 1700)
             
             
-    def run_simulation(self, output_file='Outputs/uav_output.csv'):
-        
+    def run_simulation(self, output_file=None):
+        if output_file is None:
+            # Timestamp the default output so a run never silently overwrites
+            # the previous one's results, and save a copy of the config that
+            # produced it alongside, for reproducibility.
+            timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
+            output_file = f'Outputs/uav_output_{timestamp}.csv'
+            try:
+                shutil.copy2(self.config_file, f'Outputs/config_{timestamp}.json')
+            except OSError as e:
+                print(f"Warning: could not copy config alongside output: {e}")
+
         polygon_ids = [f"fov_polygon_{i}" for i in range(self.num_UAVs)]
         border_polygon_ids = [f"fov_border_polygon_{i}" for i in range(self.num_UAVs)]
         poi_ids = [f"uav_poi_{i}" for i in range(self.num_UAVs)]
