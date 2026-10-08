@@ -18,8 +18,9 @@ except (FileNotFoundError, ValueError) as e:
     messagebox.showerror("Startup Error", f"Could not load {config_file_path}:\n\n{e}")
     sys.exit(1)
 
-# Track the running simulation process or thread
-simulation_process = None
+# Track the running simulation thread, so Run can refuse to launch a second
+# simulation while one is already in progress.
+simulation_thread = None
 
 # Update config.json
 def update_config(show_confirmation=True):
@@ -64,7 +65,14 @@ def _collect_entry_values():
 
 # Run the main.py file in a separate thread (avoid blocking the main sim thread)
 def run_main_exp():
-    global simulation_process
+    global simulation_thread
+
+    if simulation_thread is not None and simulation_thread.is_alive():
+        messagebox.showwarning(
+            "Simulation Already Running",
+            "A simulation is already running. Wait for it to finish before starting another."
+        )
+        return
 
     new_values, errors = _collect_entry_values()
     if errors:
@@ -98,7 +106,8 @@ def run_main_exp():
         return
 
     script_path = 'main.py'  # Adjust the path if necessary
-    simulation_process = threading.Thread(target=subprocess.run, args=([sys.executable, script_path],)).start()
+    simulation_thread = threading.Thread(target=subprocess.run, args=([sys.executable, script_path],))
+    simulation_thread.start()
 
 # Change/update config.json
 def apply_changes():
