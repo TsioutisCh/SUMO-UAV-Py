@@ -32,6 +32,20 @@ _BG = '#2E2E2E'
 _FIELD_BG = '#3C3F41'
 _FG = '#FFFFFF'
 
+# Matches the Helvetica convention already established by main.py's live
+# popup (the closest existing precedent - a secondary Toplevel, not the
+# main config form's slightly larger uavpy_gui.py convention).
+_FONT = ('Helvetica', 11)
+_FONT_SMALL = ('Helvetica', 9)
+_FONT_BUTTON = ('Helvetica', 10)
+
+# Plot colors chosen so the matplotlib figure reads as part of the same
+# dark theme as the surrounding Tkinter widgets, instead of a plain white
+# rectangle dropped into a dark window.
+_PLOT_GRID = '#555555'
+_PLOT_NETWORK = '#8A8A8A'
+_PLOT_MARKER = '#FFD54F'
+
 _UAV_COLORS = [
     'tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
     'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan',
@@ -168,9 +182,11 @@ class FlightPlanEditor(tk.Toplevel):
     def _build_widgets(self):
         style = ttk.Style(self)
         style.theme_use('alt')
-        style.configure('TButton', background=_BG, foreground=_FG)
-        style.configure('TLabel', background=_BG, foreground=_FG)
-        style.configure('TCombobox', fieldbackground=_FIELD_BG, foreground=_FG)
+        style.configure('TButton', background=_BG, foreground=_FG, font=_FONT_BUTTON)
+        style.configure('TLabel', background=_BG, foreground=_FG, font=_FONT)
+        style.configure('TCombobox', fieldbackground=_FIELD_BG, foreground=_FG, font=_FONT)
+        style.configure('Treeview', background=_FIELD_BG, fieldbackground=_FIELD_BG, foreground=_FG, font=_FONT_SMALL, rowheight=22)
+        style.configure('Treeview.Heading', background=_BG, foreground=_FG, font=_FONT_BUTTON)
 
         main_frame = tk.Frame(self, bg=_BG)
         main_frame.pack(fill='both', expand=True, padx=10, pady=10)
@@ -178,7 +194,7 @@ class FlightPlanEditor(tk.Toplevel):
         map_frame = tk.Frame(main_frame, bg=_BG)
         map_frame.pack(side='left', fill='both', expand=True)
 
-        self.figure = Figure(figsize=(6, 6))
+        self.figure = Figure(figsize=(6, 6), facecolor=_BG)
         self.axes = self.figure.add_subplot(111)
         self.canvas = FigureCanvasTkAgg(self.figure, master=map_frame)
         self.canvas.get_tk_widget().pack(fill='both', expand=True)
@@ -189,9 +205,9 @@ class FlightPlanEditor(tk.Toplevel):
 
         selector_frame = tk.Frame(side_frame, bg=_BG)
         selector_frame.pack(fill='x', pady=(0, 5))
-        tk.Label(selector_frame, text="UAV:", bg=_BG, fg=_FG).pack(side='left')
+        tk.Label(selector_frame, text="UAV:", bg=_BG, fg=_FG, font=_FONT).pack(side='left')
         self.uav_selector = ttk.Combobox(
-            selector_frame, state='readonly',
+            selector_frame, state='readonly', font=_FONT,
             values=[str(i) for i in range(self.num_uavs)],
         )
         self.uav_selector.current(0)
@@ -208,17 +224,17 @@ class FlightPlanEditor(tk.Toplevel):
 
         row_buttons = tk.Frame(side_frame, bg=_BG)
         row_buttons.pack(fill='x', pady=(0, 10))
-        tk.Button(row_buttons, text="New Row", command=self._clear_row_form).pack(side='left', padx=2)
-        tk.Button(row_buttons, text="Delete Selected", command=self._delete_row).pack(side='left', padx=2)
+        tk.Button(row_buttons, text="New Row", command=self._clear_row_form, font=_FONT_BUTTON).pack(side='left', padx=2)
+        tk.Button(row_buttons, text="Delete Selected", command=self._delete_row, font=_FONT_BUTTON).pack(side='left', padx=2)
 
         form_frame = tk.Frame(side_frame, bg=_BG)
         form_frame.pack(fill='x')
 
         def add_field(row, label_text):
-            tk.Label(form_frame, text=label_text, bg=_BG, fg=_FG).grid(
+            tk.Label(form_frame, text=label_text, bg=_BG, fg=_FG, font=_FONT).grid(
                 row=row, column=0, sticky='w', padx=5, pady=3
             )
-            entry = tk.Entry(form_frame, bg=_FIELD_BG, fg=_FG, insertbackground=_FG, width=14)
+            entry = tk.Entry(form_frame, bg=_FIELD_BG, fg=_FG, insertbackground=_FG, font=_FONT, width=14)
             entry.grid(row=row, column=1, padx=5, pady=3)
             return entry
 
@@ -229,21 +245,21 @@ class FlightPlanEditor(tk.Toplevel):
         self.yaw_entry = add_field(4, "Yaw (deg):")
 
         self.error_label = tk.Label(
-            side_frame, text="", bg=_BG, fg='#FF6B6B', wraplength=360, justify='left',
+            side_frame, text="", bg=_BG, fg='#FF6B6B', font=_FONT_SMALL, wraplength=360, justify='left',
         )
         self.error_label.pack(fill='x', pady=(0, 5))
 
         coord_buttons = tk.Frame(side_frame, bg=_BG)
         coord_buttons.pack(fill='x', pady=(0, 5))
-        tk.Button(coord_buttons, text="Paste X,Y from clipboard", command=self._paste_position).pack(side='left', padx=2)
-        tk.Button(coord_buttons, text="Set X,Y from map click", command=self._arm_map_click).pack(side='left', padx=2)
+        tk.Button(coord_buttons, text="Paste X,Y from clipboard", command=self._paste_position, font=_FONT_BUTTON).pack(side='left', padx=2)
+        tk.Button(coord_buttons, text="Set X,Y from map click", command=self._arm_map_click, font=_FONT_BUTTON).pack(side='left', padx=2)
 
-        tk.Button(side_frame, text="Save Row", command=self._save_row, bg='#4CAF50', fg=_FG).pack(fill='x', pady=(5, 10))
+        tk.Button(side_frame, text="Save Row", command=self._save_row, bg='#4CAF50', fg=_FG, font=_FONT).pack(fill='x', pady=(5, 10))
 
         bottom_buttons = tk.Frame(side_frame, bg=_BG)
         bottom_buttons.pack(fill='x', side='bottom', pady=10)
-        tk.Button(bottom_buttons, text="Apply", command=self._apply, bg='#4CAF50', fg=_FG).pack(side='left', padx=5)
-        tk.Button(bottom_buttons, text="Cancel", command=self._on_close, bg='#F44336', fg=_FG).pack(side='left', padx=5)
+        tk.Button(bottom_buttons, text="Apply", command=self._apply, bg='#4CAF50', fg=_FG, font=_FONT).pack(side='left', padx=5)
+        tk.Button(bottom_buttons, text="Cancel", command=self._on_close, bg='#F44336', fg=_FG, font=_FONT).pack(side='left', padx=5)
 
     # -- table / row editing --------------------------------------------
 
@@ -414,6 +430,14 @@ class FlightPlanEditor(tk.Toplevel):
 
     def _redraw(self):
         self.axes.clear()
+        # axes.clear() resets facecolor/spines/ticks to matplotlib defaults,
+        # so the dark theme has to be re-applied every redraw, not just once
+        # at construction time.
+        self.axes.set_facecolor(_FIELD_BG)
+        for spine in self.axes.spines.values():
+            spine.set_color(_FG)
+        self.axes.tick_params(colors=_FG, labelsize=9)
+        self.axes.grid(True, color=_PLOT_GRID, linestyle='--', linewidth=0.5, alpha=0.6)
 
         try:
             geometry = parse_network_geometry(self.config_data.get('Network file', ''))
@@ -424,7 +448,7 @@ class FlightPlanEditor(tk.Toplevel):
             for segment in geometry.segments:
                 xs = [p[0] for p in segment]
                 ys = [p[1] for p in segment]
-                self.axes.plot(xs, ys, color='#555555', linewidth=0.5, zorder=1)
+                self.axes.plot(xs, ys, color=_PLOT_NETWORK, linewidth=0.6, zorder=1)
             self.axes.set_xlim(geometry.bounds[0], geometry.bounds[2])
             self.axes.set_ylim(geometry.bounds[1], geometry.bounds[3])
 
@@ -437,19 +461,29 @@ class FlightPlanEditor(tk.Toplevel):
                 color = _UAV_COLORS[uav_id % len(_UAV_COLORS)]
                 is_selected = uav_id == self.selected_uav
                 self.axes.plot(
-                    xs, ys, color=color, linewidth=2.0 if is_selected else 0.8,
-                    alpha=1.0 if is_selected else 0.4, zorder=2,
+                    xs, ys, color=color, linewidth=2.2 if is_selected else 0.9,
+                    alpha=1.0 if is_selected else 0.45, zorder=2,
                 )
 
         # Label only the selected UAV's own waypoints with their times, to
         # avoid an unreadable wall of overlapping labels with many UAVs.
         for t, x, y, z, yaw in self._current_waypoints():
-            self.axes.plot(x, y, 'o', color='black', zorder=3)
+            self.axes.plot(
+                x, y, 'o', color=_PLOT_MARKER, markersize=7,
+                markeredgecolor=_FIELD_BG, markeredgewidth=1.0, zorder=3,
+            )
             self.axes.annotate(
-                f"t={t:g}s", (x, y), textcoords='offset points', xytext=(5, 5), fontsize=8
+                f"t={t:g}s", (x, y), textcoords='offset points', xytext=(6, 6),
+                fontsize=8, color=_FG,
             )
 
+        self.axes.set_title(
+            f"UAV {self.selected_uav} flight plan", color=_FG, fontsize=12, fontweight='bold'
+        )
+        self.axes.set_xlabel("X (m)", color=_FG, fontsize=9)
+        self.axes.set_ylabel("Y (m)", color=_FG, fontsize=9)
         self.axes.set_aspect('equal', adjustable='datalim')
+        self.figure.tight_layout()
         self.canvas.draw_idle()
 
     # -- apply / cancel ---------------------------------------------------
