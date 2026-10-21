@@ -77,3 +77,27 @@ class TestPathParity:
         sim_bench = main_test.UAVSimulation(config_path)
 
         _assert_identical_paths(sim_main, sim_bench)
+
+    def test_yaw_wraparound_takes_the_short_way(self, tmp_path):
+        # A yaw change that crosses the 0/360 boundary (10deg -> 350deg):
+        # the raw difference is +340 (the long way around), but the
+        # shortest path is only -20. Both the number of rotate steps AND
+        # the per-step interpolated yaw values must reflect the short path,
+        # not an over-rotation through the long one (see D-005).
+        uav_data = [[0, 100, 100, 50, 10], [10, 100, 100, 50, 350]]
+        config_path = _write_config(tmp_path, uav_data)
+
+        sim_main = main.UAVSimulation(config_path)
+        sim_bench = main_test.UAVSimulation(config_path)
+
+        _assert_identical_paths(sim_main, sim_bench)
+
+        # Not just identical to each other - actually correct. No
+        # intermediate yaw value should ever jump by more than yaw_speed
+        # degrees (circularly - e.g. -10 and 350 are 0 degrees apart, not
+        # 360) in a single step, which an over-rotation through the long
+        # way around would violate.
+        yaws = np.array(sim_main.uav_yaw_angles_list[0])
+        raw_deltas = np.diff(yaws)
+        circular_deltas = np.abs((raw_deltas + 180) % 360 - 180)
+        assert circular_deltas.max() <= sim_main.yaw_speed * sim_main.simulation_step_length + 1e-6

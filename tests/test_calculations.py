@@ -64,6 +64,42 @@ class TestCalculateRotateSteps:
         assert calc.calculate_rotate_steps(360) == 1
 
 
+class TestNormalizeYawDifference:
+    def test_no_wraparound_positive(self, calc):
+        # Already the shortest path - unchanged from the raw difference.
+        assert calc.normalize_yaw_difference(90) == pytest.approx(90)
+
+    def test_no_wraparound_negative(self, calc):
+        assert calc.normalize_yaw_difference(-90) == pytest.approx(-90)
+
+    def test_wraparound_takes_the_short_way(self, calc):
+        # 10deg -> 350deg: raw difference is +340 (the long way around),
+        # but the shortest path is -20 (10 -> 0/360 -> 350).
+        assert calc.normalize_yaw_difference(340) == pytest.approx(-20)
+
+    def test_wraparound_the_other_direction(self, calc):
+        # 350deg -> 10deg: raw difference is -340, shortest path is +20.
+        assert calc.normalize_yaw_difference(-340) == pytest.approx(20)
+
+    def test_exactly_opposite_is_a_valid_tie(self, calc):
+        # 180 degrees either way is equally short; just needs to be a
+        # deterministic, bounded value, not literally +-180 both ways.
+        result = calc.normalize_yaw_difference(180)
+        assert abs(result) == pytest.approx(180)
+
+    def test_consistent_with_calculate_rotate_steps(self, calc):
+        # The step COUNT (calculate_rotate_steps) and the signed delta
+        # (normalize_yaw_difference) must agree on the shortest-path
+        # magnitude for the same raw input - that consistency is the whole
+        # point of this method (see D-005).
+        for raw_diff in [45, -45, 200, -200, 340, -340, 0, 360]:
+            steps = calc.calculate_rotate_steps(raw_diff)
+            delta = calc.normalize_yaw_difference(raw_diff)
+            step_angle = calc.yaw_speed * calc.simulation_step_length
+            expected_steps = max(1, int(np.ceil(abs(delta) / step_angle)))
+            assert steps == expected_steps, f"mismatch for raw_diff={raw_diff}"
+
+
 class TestFovCalculation:
     def test_90_degree_fov_at_10m_height(self, calc):
         # tan(45deg) == 1, so a 90deg FOV footprint is exactly 2x the height.

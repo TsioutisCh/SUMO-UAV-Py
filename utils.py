@@ -51,7 +51,25 @@ class Calculations:
         step_angle = self.yaw_speed * self.simulation_step_length
         steps = int(np.ceil(yaw_difference / step_angle))
         return steps if steps > 0 else 1
-    
+
+    # DECISION plan-2026-10-07T075432-0e92718c/D-005: calculate_rotate_steps
+    # above only returns an unsigned STEP COUNT for the shortest rotation; it
+    # throws away which direction that is. Callers that then interpolate the
+    # actual per-step yaw values from the raw (non-normalized) difference -
+    # e.g. "current + (target - current) * step/steps" - end up animating
+    # the LONG way around while only taking as many steps as the SHORT way
+    # needs, producing a wild over-rotation (e.g. 10deg -> 350deg raw diff is
+    # 340deg, but the shortest path is only -20deg). Use THIS method's
+    # output for interpolation instead of the raw difference, and reuse the
+    # same raw difference as calculate_rotate_steps's input so the two stay
+    # consistent (both derive the same shortest path, just unsigned-steps vs
+    # signed-degrees). Do not remove without re-reading D-005.
+    @timing_decorator
+    def normalize_yaw_difference(self, yaw_difference):
+        """Signed shortest-path equivalent of a raw yaw difference (e.g.
+        target_yaw - current_yaw), normalized to (-180, 180]."""
+        return (yaw_difference + 180) % 360 - 180
+
     @timing_decorator
     def calculate_fov_corners(self, uav_position, fov_size, yaw_angle):
         uav_x, uav_y, _ = uav_position
