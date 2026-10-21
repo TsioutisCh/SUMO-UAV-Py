@@ -10,7 +10,12 @@ Tk/Toplevel needs a display, and these tests never do that.
 
 import pytest
 
-from flight_plan_editor import find_duplicate_time, parse_waypoint_fields, sorted_by_time
+from flight_plan_editor import (
+    find_duplicate_time,
+    find_malformed_waypoint,
+    parse_waypoint_fields,
+    sorted_by_time,
+)
 
 
 class TestParseWaypointFields:
@@ -65,3 +70,32 @@ class TestSortedByTime:
     def test_already_sorted_is_unchanged(self):
         waypoints = [[0, 0, 0, 0, 0], [10, 1, 1, 1, 1]]
         assert sorted_by_time(waypoints) == waypoints
+
+
+class TestFindMalformedWaypoint:
+    def test_well_formed_data_returns_none(self):
+        uav_data = {"0": [[0, 1, 2, 3, 4]], "1": [[0, 1, 2, 3, 4], [10, 5, 6, 7, 8]]}
+        assert find_malformed_waypoint(uav_data, num_uavs=2) is None
+
+    def test_too_few_fields_is_caught(self):
+        uav_data = {"0": [[0, 1, 2, 3]]}  # missing yaw
+        assert find_malformed_waypoint(uav_data, num_uavs=1) == (0, [0, 1, 2, 3])
+
+    def test_too_many_fields_is_caught(self):
+        uav_data = {"0": [[0, 1, 2, 3, 4, 5]]}
+        assert find_malformed_waypoint(uav_data, num_uavs=1) == (0, [0, 1, 2, 3, 4, 5])
+
+    def test_non_numeric_field_is_caught(self):
+        uav_data = {"0": [[0, 1, 2, 3, "north"]]}
+        assert find_malformed_waypoint(uav_data, num_uavs=1) == (0, [0, 1, 2, 3, "north"])
+
+    def test_only_checks_uavs_within_num_uavs_range(self):
+        # A malformed waypoint on a UAV id outside range(num_uavs) is never
+        # displayed/used by the editor, so it's not this function's job to
+        # flag it.
+        uav_data = {"0": [[0, 1, 2, 3, 4]], "5": [[0, 1, 2]]}
+        assert find_malformed_waypoint(uav_data, num_uavs=1) is None
+
+    def test_identifies_which_uav_and_waypoint(self):
+        uav_data = {"0": [[0, 1, 2, 3, 4]], "1": [[0, 1, 2, 3, 4], [10, 1, 2]]}
+        assert find_malformed_waypoint(uav_data, num_uavs=2) == (1, [10, 1, 2])

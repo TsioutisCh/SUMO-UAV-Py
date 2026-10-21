@@ -72,6 +72,27 @@ def sorted_by_time(waypoints):
     return sorted(waypoints, key=lambda wp: wp[0])
 
 
+def find_malformed_waypoint(uav_data, num_uavs):
+    """Return (uav_id, waypoint) for the first waypoint that isn't exactly
+    5 numeric values, or None if every UAV's waypoints are well-formed.
+
+    Catches hand-edited config.json data that reaches this editor without
+    having gone through its own 5-field save path (which always produces a
+    valid shape) - without this, a malformed waypoint crashes deep inside
+    the unpacking/plotting code instead of showing a clear message.
+    """
+    for uav_id in range(num_uavs):
+        for wp in uav_data.get(str(uav_id), []):
+            if len(wp) != 5:
+                return uav_id, wp
+            try:
+                for v in wp:
+                    float(v)
+            except (TypeError, ValueError):
+                return uav_id, wp
+    return None
+
+
 def open_flight_plan_editor(parent, config_data):
     """Open the Flight Plan editor against the live config_data dict.
 
@@ -120,6 +141,23 @@ class FlightPlanEditor(tk.Toplevel):
             if not self.working_uav_data.get(key):
                 self.working_uav_data[key] = [[0.0, 0.0, 0.0, 0.0, 0.0]]
 
+        # DECISION plan-2026-10-21T101227-fd3e32c6/D-003: validate waypoint
+        # shape up front and refuse to open, rather than let a malformed
+        # hand-edited waypoint crash later inside unpacking/plotting code
+        # with a raw traceback. See decisions.md D-003.
+        malformed = find_malformed_waypoint(self.working_uav_data, self.num_uavs)
+        if malformed is not None:
+            bad_uav_id, bad_wp = malformed
+            messagebox.showerror(
+                "Flight Plan Editor",
+                f"UAV {bad_uav_id} has a malformed waypoint ({bad_wp!r}) - "
+                "expected exactly 5 numeric values (time, x, y, z, yaw). "
+                "Fix it in config.json directly, then reopen this editor.",
+                parent=self,
+            )
+            self.destroy()
+            return
+
         self._build_widgets()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self._refresh_table()
@@ -161,7 +199,7 @@ class FlightPlanEditor(tk.Toplevel):
         self.uav_selector.bind('<<ComboboxSelected>>', self._on_select_uav)
 
         columns = ('time', 'x', 'y', 'z', 'yaw')
-        self.table = ttk.Treeview(side_frame, columns=columns, show='headings', height=8)
+        self.table = ttk.Treeview(side_frame, columns=columns, show='headings', height=8, selectmode='browse')
         for col, label in zip(columns, ('Time', 'X', 'Y', 'Z', 'Yaw')):
             self.table.heading(col, text=label)
             self.table.column(col, width=60, anchor='center')
@@ -229,6 +267,7 @@ class FlightPlanEditor(tk.Toplevel):
             return
         index = int(selection[0])
         self._selected_row_index = index
+        self._disarm_map_click()
         self._fill_row_form(self._current_waypoints()[index])
 
     def _fill_row_form(self, wp):
@@ -241,9 +280,16 @@ class FlightPlanEditor(tk.Toplevel):
 
     def _clear_row_form(self):
         self._selected_row_index = None
+        self._disarm_map_click()
         for entry in (self.time_entry, self.x_entry, self.y_entry, self.z_entry, self.yaw_entry):
             entry.delete(0, tk.END)
         self.error_label.config(text="")
+
+    def _disarm_map_click(self):
+        # Switching which row/UAV is being edited must cancel a pending
+        # "set from map click" arm - otherwise a later click silently fills
+        # coordinates for whatever is now selected, not what was armed.
+        self._pending_map_click_target = None
 
     def _paste_position(self):
         try:
@@ -335,14 +381,22 @@ class FlightPlanEditor(tk.Toplevel):
         duplicating or re-deriving it. Returns None (and shows an error) if
         the current in-progress edits don't yet form a loadable config.
         """
-        if self._scratch_path is None:
-            fd, self._scratch_path = tempfile.mkstemp(suffix='.json', prefix='flight_plan_preview_')
-            os.close(fd)
+        # DECISION plan-2026-10-21T101227-fd3e32c6/D-003: wrap the scratch
+        # file creation/write in try/except too, not just the UAVSimulation
+        # construction below - a disk-full/permissions error here must not
+        # raise uncaught. See decisions.md D-003.
+        try:
+            if self._scratch_path is None:
+                fd, self._scratch_path = tempfile.mkstemp(suffix='.json', prefix='flight_plan_preview_')
+                os.close(fd)
 
-        scratch_config = dict(self.config_data)
-        scratch_config['uav_data'] = self.working_uav_data
-        with open(self._scratch_path, 'w') as f:
-            json.dump(scratch_config, f)
+            scratch_config = dict(self.config_data)
+            scratch_config['uav_data'] = self.working_uav_data
+            with open(self._scratch_path, 'w', encoding='utf-8') as f:
+                json.dump(scratch_config, f)
+        except OSError as e:
+            self.error_label.config(text=f"Can't write preview scratch file: {e}")
+            return None
 
         try:
             sim = main.UAVSimulation(self._scratch_path)
