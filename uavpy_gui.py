@@ -8,6 +8,7 @@ import sys
 import threading
 
 from config import ConfigError, load_uav_config
+from flight_plan_editor import open_flight_plan_editor
 
 # Load config.json
 config_file_path = 'config.json'  # Adjust the path if necessary
@@ -122,8 +123,15 @@ def apply_changes():
     update_config()
 
 # Close pop-upstop SUMO
-def cancel():    
+def cancel():
     root.destroy()
+
+# Open the combined waypoint map + table editor against the live
+# config_data dict. Edits only land in config_data (and so in config.json)
+# when the editor's own Apply button is clicked - Cancel/close leaves
+# config_data untouched, same as every other field here until Apply/Run.
+def open_flight_plan():
+    open_flight_plan_editor(root, config_data)
 
 # Show or hide fields based on "Uav Model" selection
 def toggle_manual_fields(*args):
@@ -273,8 +281,11 @@ run_button.grid(row=0, column=0, padx=10)
 apply_button = tk.Button(button_frame, text="Apply", command=apply_changes, bg='#4CAF50', fg='#FFFFFF', activebackground='#45A049')
 apply_button.grid(row=0, column=1, padx=10)
 
+flight_plan_button = tk.Button(button_frame, text="Flight Plan...", command=open_flight_plan, bg='#4CAF50', fg='#FFFFFF', activebackground='#45A049')
+flight_plan_button.grid(row=0, column=2, padx=10)
+
 cancel_button = tk.Button(button_frame, text="Cancel", command=cancel, bg='#F44336', fg='#FFFFFF', activebackground='#E57373')
-cancel_button.grid(row=0, column=2, padx=10)
+cancel_button.grid(row=0, column=3, padx=10)
 
 # Initially hide manual fields if "Uav Model" is not "Manual"
 toggle_manual_fields()
