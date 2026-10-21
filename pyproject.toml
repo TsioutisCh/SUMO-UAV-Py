@@ -32,7 +32,7 @@ dev = [
 Homepage = "https://github.com/TsioutisCh/SUMO-UAV-Py"
 
 [tool.setuptools]
-py-modules = ["main", "main_test", "utils", "config", "client"]
+py-modules = ["main", "main_test", "utils", "config", "client", "flight_plan_editor", "network_geometry"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
