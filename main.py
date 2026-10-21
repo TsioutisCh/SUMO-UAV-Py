@@ -456,9 +456,25 @@ class UAVSimulation:
 
     def update_uav_path(self, uav_id, details):
         # Here I ignore one waypoint after the new entry
-        
+
         time, x, y, z, yaw_angle = details
-    
+
+        # DECISION plan-2026-10-07T075432-0e92718c/D-004: clamp a stale/past
+        # start time up to "right now" (read fresh here, at apply-time - not
+        # whatever time the popup captured when it opened). A human takes
+        # several real seconds to fill in the popup; without this clamp, the
+        # scheduled rotate+move+rotate maneuver is often already entirely in
+        # the past by the time this runs, so the main loop (which only
+        # checks the live, ever-advancing step - see run_simulation's
+        # "if step in times") skips every intermediate frame and the UAV
+        # appears to teleport straight to the target instead of flying
+        # there. Do not remove this without re-reading D-004 - an explicit
+        # *future* time the user actually typed is left untouched; only a
+        # time that has already fallen behind "now" gets bumped forward.
+        live_time_now = self.current_step * self.simulation_step_length
+        if time < live_time_now:
+            time = live_time_now
+
         # Check if local GUI is true and modify the path accordingly
         if self.local_gui:
             if str(uav_id) in self.uav_data:
