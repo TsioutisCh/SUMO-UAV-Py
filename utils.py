@@ -42,12 +42,6 @@ class Calculations:
         distance = np.linalg.norm(end_pos - start_pos)
         return int(distance / (self.uav_speed * self.simulation_step_length))
     
-    # @timing_decorator
-    # def calculate_rotate_steps_(self, yaw_difference):
-    #     yaw_difference = (yaw_difference + 360) % 360  # to choose the correct rotation angle
-    #     yaw_difference = abs(yaw_difference)
-    #     return int((yaw_difference / (self.yaw_speed * self.simulation_step_length)))  
-    
     @timing_decorator
     def calculate_rotate_steps(self, yaw_difference):
         # Normalize the yaw difference to the minimal angle [0, 180]
@@ -57,7 +51,25 @@ class Calculations:
         step_angle = self.yaw_speed * self.simulation_step_length
         steps = int(np.ceil(yaw_difference / step_angle))
         return steps if steps > 0 else 1
-    
+
+    # DECISION plan-2026-10-07T075432-0e92718c/D-005: calculate_rotate_steps
+    # above only returns an unsigned STEP COUNT for the shortest rotation; it
+    # throws away which direction that is. Callers that then interpolate the
+    # actual per-step yaw values from the raw (non-normalized) difference -
+    # e.g. "current + (target - current) * step/steps" - end up animating
+    # the LONG way around while only taking as many steps as the SHORT way
+    # needs, producing a wild over-rotation (e.g. 10deg -> 350deg raw diff is
+    # 340deg, but the shortest path is only -20deg). Use THIS method's
+    # output for interpolation instead of the raw difference, and reuse the
+    # same raw difference as calculate_rotate_steps's input so the two stay
+    # consistent (both derive the same shortest path, just unsigned-steps vs
+    # signed-degrees). Do not remove without re-reading D-005.
+    @timing_decorator
+    def normalize_yaw_difference(self, yaw_difference):
+        """Signed shortest-path equivalent of a raw yaw difference (e.g.
+        target_yaw - current_yaw), normalized to (-180, 180]."""
+        return (yaw_difference + 180) % 360 - 180
+
     @timing_decorator
     def calculate_fov_corners(self, uav_position, fov_size, yaw_angle):
         uav_x, uav_y, _ = uav_position

@@ -2,17 +2,26 @@ import tkinter as tk
 from tkinter import messagebox, filedialog
 from tkinter import ttk
 import json
+import shutil
 import subprocess
 import sys
 import threading
 
+from config import ConfigError, load_uav_config
+from flight_plan_editor import open_flight_plan_editor
+
 # Load config.json
 config_file_path = 'config.json'  # Adjust the path if necessary
-with open(config_file_path, 'r') as f:
-    config_data = json.load(f)
+try:
+    with open(config_file_path, 'r') as f:
+        config_data = json.load(f)
+except (FileNotFoundError, ValueError) as e:
+    messagebox.showerror("Startup Error", f"Could not load {config_file_path}:\n\n{e}")
+    sys.exit(1)
 
-# Track the running simulation process or thread
-simulation_process = None
+# Track the running simulation thread, so Run can refuse to launch a second
+# simulation while one is already in progress.
+simulation_thread = None
 
 # Update config.json
 def update_config(show_confirmation=True):
@@ -57,7 +66,14 @@ def _collect_entry_values():
 
 # Run the main.py file in a separate thread (avoid blocking the main sim thread)
 def run_main_exp():
-    global simulation_process
+    global simulation_thread
+
+    if simulation_thread is not None and simulation_thread.is_alive():
+        messagebox.showwarning(
+            "Simulation Already Running",
+            "A simulation is already running. Wait for it to finish before starting another."
+        )
+        return
 
     new_values, errors = _collect_entry_values()
     if errors:
@@ -72,8 +88,27 @@ def run_main_exp():
     config_data.update(new_values)
     update_config(show_confirmation=False)
 
+    # Preflight: validate the config we just saved and make sure the right
+    # SUMO executable is on PATH, so a bad config/missing install shows a
+    # clear message here instead of failing invisibly inside the subprocess.
+    try:
+        cfg = load_uav_config(config_file_path)
+    except ConfigError as e:
+        messagebox.showerror("Invalid Configuration", str(e))
+        return
+
+    sumo_executable = 'sumo-gui' if cfg['GuiOption'] else 'sumo'
+    if shutil.which(sumo_executable) is None:
+        messagebox.showerror(
+            "SUMO Not Found",
+            f"Could not find '{sumo_executable}' on your PATH.\n\n"
+            "Make sure SUMO is installed and SUMO_HOME/bin is on PATH."
+        )
+        return
+
     script_path = 'main.py'  # Adjust the path if necessary
-    simulation_process = threading.Thread(target=subprocess.run, args=([sys.executable, script_path],)).start()
+    simulation_thread = threading.Thread(target=subprocess.run, args=([sys.executable, script_path],))
+    simulation_thread.start()
 
 # Change/update config.json
 def apply_changes():
@@ -88,8 +123,15 @@ def apply_changes():
     update_config()
 
 # Close pop-upstop SUMO
-def cancel():    
+def cancel():
     root.destroy()
+
+# Open the combined waypoint map + table editor against the live
+# config_data dict. Edits only land in config_data (and so in config.json)
+# when the editor's own Apply button is clicked - Cancel/close leaves
+# config_data untouched, same as every other field here until Apply/Run.
+def open_flight_plan():
+    open_flight_plan_editor(root, config_data)
 
 # Show or hide fields based on "Uav Model" selection
 def toggle_manual_fields(*args):
@@ -239,8 +281,11 @@ run_button.grid(row=0, column=0, padx=10)
 apply_button = tk.Button(button_frame, text="Apply", command=apply_changes, bg='#4CAF50', fg='#FFFFFF', activebackground='#45A049')
 apply_button.grid(row=0, column=1, padx=10)
 
+flight_plan_button = tk.Button(button_frame, text="Flight Plan...", command=open_flight_plan, bg='#4CAF50', fg='#FFFFFF', activebackground='#45A049')
+flight_plan_button.grid(row=0, column=2, padx=10)
+
 cancel_button = tk.Button(button_frame, text="Cancel", command=cancel, bg='#F44336', fg='#FFFFFF', activebackground='#E57373')
-cancel_button.grid(row=0, column=2, padx=10)
+cancel_button.grid(row=0, column=3, padx=10)
 
 # Initially hide manual fields if "Uav Model" is not "Manual"
 toggle_manual_fields()

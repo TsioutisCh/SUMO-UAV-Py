@@ -2,6 +2,9 @@
 Main code of SUAVPy
 """
 
+import re
+import shutil
+import sys
 import threading
 import traci
 import csv
@@ -9,9 +12,14 @@ import numpy as np
 import ujson as json
 import socket
 import tkinter as tk
+from datetime import datetime
 from tkinter import messagebox, ttk, Toplevel, Label
 from utils import Calculations
-from config import load_uav_config
+from config import ConfigError, load_uav_config
+
+# Matches the (possibly negative, possibly decimal) numbers in a copied
+# SUMO-GUI cursor position, e.g. "1234.56,789.01" or "x=1234.56, y=789.01".
+_COORD_PATTERN = re.compile(r'-?\d+\.?\d*')
 
 
 def non_blocking_warning(title, message):
@@ -33,11 +41,11 @@ def non_blocking_warning(title, message):
     warning_window.attributes("-topmost", True) 
     
 
-def get_uav_position_input():
+def get_uav_position_input(current_time=None):
     root = tk.Tk()
-    
+
     root.title("Local GUI")
-    
+
     root.withdraw()
 
     # Set the window icon
@@ -46,7 +54,7 @@ def get_uav_position_input():
         root.iconbitmap(icon_path)
     except tk.TclError:
         pass  # .ico icons are only supported on Windows
-    
+
     root.geometry("400x250")
     #root.resizable(False, False)
 
@@ -68,49 +76,121 @@ def get_uav_position_input():
         dialog.iconbitmap(icon_path)
     except tk.TclError:
         pass  # .ico icons are only supported on Windows
-    
+
     dialog.attributes("-topmost", True)
 
-    # UAV ID input
-    uav_id_label = tk.Label(dialog, text="Enter UAV ID:", bg='#2E2E2E', fg='#FFFFFF', font=('Helvetica', 11))
-    uav_id_label.grid(row=0, column=0, sticky='nsew', padx=5, pady=5)  # Centered with 'nsew' sticky option
-    uav_id_entry = tk.Entry(dialog, bg='#3C3F41', fg='#FFFFFF', insertbackground='#FFFFFF', font=('Helvetica', 11))
-    uav_id_entry.grid(row=0, column=1, padx=5, pady=5)
+    def add_field(row, label_text):
+        label = tk.Label(dialog, text=label_text, bg='#2E2E2E', fg='#FFFFFF', font=('Helvetica', 11))
+        label.grid(row=row, column=0, sticky='w', padx=5, pady=5)
+        entry = tk.Entry(dialog, bg='#3C3F41', fg='#FFFFFF', insertbackground='#FFFFFF', font=('Helvetica', 11), width=16)
+        entry.grid(row=row, column=1, padx=5, pady=5)
+        return entry
 
-    # UAV position input
-    position_label = tk.Label(dialog, text="Enter UAV position as \n (t, x, y, z, φ):", bg='#2E2E2E', fg='#FFFFFF', font=('Arimo', 11))
-    position_label.grid(row=1, column=0, sticky='nsew', padx=5, pady=5)  # Centered with 'nsew' sticky option
-    position_entry = tk.Entry(dialog, bg='#3C3F41', fg='#FFFFFF', insertbackground='#FFFFFF', font=('Helvetica', 11))
-    position_entry.grid(row=1, column=1, padx=5, pady=5)
+    uav_id_entry = add_field(0, "UAV ID:")
+    time_entry = add_field(1, "Time (s) — blank = now:")
+    x_entry = add_field(2, "X:")
+    y_entry = add_field(3, "Y:")
+    z_entry = add_field(4, "Z / altitude:")
+    yaw_entry = add_field(5, "Yaw (deg):")
+
+    # Pre-fill with the current simulation time so it's visible as the
+    # default; leaving it blank (or clearing it) at Submit falls back to
+    # whatever the simulation time is at that moment.
+    if current_time is not None:
+        time_entry.insert(0, f"{current_time:.2f}")
+
+    error_label = tk.Label(
+        dialog, text="", bg='#2E2E2E', fg='#FF6B6B', font=('Helvetica', 9),
+        wraplength=360, justify='left'
+    )
+    error_label.grid(row=6, column=0, columnspan=2, sticky='w', padx=5)
+
+    def paste_position():
+        try:
+            clipboard_text = dialog.clipboard_get()
+        except tk.TclError:
+            error_label.config(text="Clipboard is empty or unavailable.")
+            return
+        numbers = _COORD_PATTERN.findall(clipboard_text)
+        if len(numbers) < 2:
+            error_label.config(
+                text="Couldn't find an X,Y pair in the clipboard "
+                     f"('{clipboard_text.strip()}'). In sumo-gui, right-click "
+                     "the map and choose 'Copy cursor position' first."
+            )
+            return
+        x_entry.delete(0, tk.END)
+        x_entry.insert(0, numbers[0])
+        y_entry.delete(0, tk.END)
+        y_entry.insert(0, numbers[1])
+        error_label.config(text="")
+
+    paste_button = tk.Button(
+        dialog, text="Paste X, Y from clipboard", command=paste_position,
+        bg='#3C3F41', fg='#FFFFFF', activebackground='#4CAF50', font=('Helvetica', 10)
+    )
+    paste_button.grid(row=7, column=0, columnspan=2, pady=(0, 5))
+
+    result = {}
+
+    def submit():
+        time_text = time_entry.get().strip()
+        if not time_text:
+            if current_time is None:
+                error_label.config(text="Time is required (no current simulation time is available).")
+                return
+            t = current_time
+        else:
+            try:
+                t = float(time_text)
+            except ValueError:
+                error_label.config(text="Time must be a number (or blank to use the current simulation time).")
+                return
+        try:
+            x = float(x_entry.get())
+            y = float(y_entry.get())
+            z = float(z_entry.get())
+            yaw = float(yaw_entry.get())
+        except ValueError:
+            error_label.config(text="X, Y, Z and Yaw must all be numbers.")
+            return
+        result['uav_id'] = uav_id_entry.get()
+        result['position'] = json.dumps([t, x, y, z, yaw])
+        root.quit()
+
+    def do_break():
+        result['uav_id'] = 'break'
+        result['position'] = ''
+        root.quit()
 
     # Button frame
     button_frame = tk.Frame(dialog, bg='#2E2E2E')
-    button_frame.grid(row=2, columnspan=2, pady=20)
+    button_frame.grid(row=8, column=0, columnspan=2, pady=15)
 
     # Submit button (green)
-    submit_button = tk.Button(button_frame, text="Submit", bg='#4CAF50', fg='#FFFFFF', activebackground='#45A049', font=('Helvetica', 11), command=root.quit)
+    submit_button = tk.Button(button_frame, text="Submit", bg='#4CAF50', fg='#FFFFFF', activebackground='#45A049', font=('Helvetica', 11), command=submit)
     submit_button.grid(row=0, column=0, padx=10)
 
     # Break button (red) that sends 'break'
-    break_button = tk.Button(button_frame, text="Break", bg='#F44336', fg='#FFFFFF', activebackground='#E57373', font=('Helvetica', 11), command=lambda: (uav_id_entry.insert(0, "break"), root.quit()))
+    break_button = tk.Button(button_frame, text="Break", bg='#F44336', fg='#FFFFFF', activebackground='#E57373', font=('Helvetica', 11), command=do_break)
     break_button.grid(row=0, column=1, padx=10)
 
-    
     root.mainloop()
-
-    uav_id_value = uav_id_entry.get()
-    position_value = position_entry.get()
-
     root.destroy()
-    return uav_id_value, position_value
+
+    # If the window was closed without Submit/Break, treat it as Break
+    # rather than leaving the caller with no result at all.
+    return result.get('uav_id', 'break'), result.get('position', '')
 
 
 class UAVSimulation:
 
     def __init__(self, config_file):
+        self.config_file = config_file
         self.read_config(config_file)
         self.timing_data = {}
         self.stop_flag = False
+        self.current_step = 0
         self.calc = Calculations(self.uav_speed, self.simulation_step_length, self.yaw_speed)
         self.uav_positions_list, self.time_list, self.uav_yaw_angles_list = self.uav_path_data()
 
@@ -122,7 +202,6 @@ class UAVSimulation:
         self.battery_mode = cfg['battery_mode']
         self.num_UAVs = cfg['num_UAVs']
         self.UavMode = cfg['UavMode']
-        self.mode = cfg['mode']
         self.movement = cfg['movement']
         self.server_option = cfg['server_option']
         self.local_gui = cfg['local_gui']
@@ -159,8 +238,18 @@ class UAVSimulation:
             #traci.gui.setOffset("View #0", 1900, 1700)
             
             
-    def run_simulation(self, output_file='Outputs/uav_output.csv'):
-        
+    def run_simulation(self, output_file=None):
+        if output_file is None:
+            # Timestamp the default output so a run never silently overwrites
+            # the previous one's results, and save a copy of the config that
+            # produced it alongside, for reproducibility.
+            timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
+            output_file = f'Outputs/uav_output_{timestamp}.csv'
+            try:
+                shutil.copy2(self.config_file, f'Outputs/config_{timestamp}.json')
+            except OSError as e:
+                print(f"Warning: could not copy config alongside output: {e}")
+
         polygon_ids = [f"fov_polygon_{i}" for i in range(self.num_UAVs)]
         border_polygon_ids = [f"fov_border_polygon_{i}" for i in range(self.num_UAVs)]
         poi_ids = [f"uav_poi_{i}" for i in range(self.num_UAVs)]
@@ -174,7 +263,14 @@ class UAVSimulation:
         battery_life_steps = {str(uav_id): max(0, self.uav_data[str(uav_id)][0][0]) for uav_id in range(self.num_UAVs)}
         polygon_exists = {i: False for i in range(self.num_UAVs)}
         poi_exists = {i: False for i in range(self.num_UAVs)}
-        
+        # Last position/yaw actually processed for each UAV, tracked
+        # separately from array adjacency - see the "moved" check below for
+        # why: a live Local GUI edit rebuilds uav_positions_list mid-run, so
+        # "index - 1" in the freshly rebuilt array no longer means "the
+        # previous frame we actually drew."
+        last_drawn_positions = {i: None for i in range(self.num_UAVs)}
+        last_drawn_yaws = {i: None for i in range(self.num_UAVs)}
+
         with open(output_file, mode='w', newline='') as file:
             writer = csv.writer(file, delimiter=',')
             writer.writerow(['Step', 'Seconds', 'UAV_ID', 'UAV_X', 'UAV_Y', 'UAV_Z', 'Yaw', 'VehicleID', 'X', 'Y', 'Speed'])
@@ -193,7 +289,8 @@ class UAVSimulation:
                 
                 traci.simulationStep()
                 step += 1
-    
+                self.current_step = step
+
                 for veh_id in traci.simulation.getDepartedIDList():
                     traci.vehicle.subscribe(veh_id, [traci.constants.VAR_POSITION, traci.constants.VAR_SPEED])
                 subscribed_data = traci.vehicle.getAllSubscriptionResults()
@@ -237,14 +334,27 @@ class UAVSimulation:
                             field_of_view_size = self.calc.fov_calculation(self.fov_degrees, uav_position[2])
                             
                             
-                            # reduce the long if statements.
-                            moved = index > 0 and (np.any(np.array(uav_positions[index - 1]) != np.array(uav_position)) or uav_yaw_angles[index - 1] != yaw_angle)
+                            # DECISION plan-2026-10-07T075432-0e92718c/D-003: compare
+                            # against last_drawn_positions/last_drawn_yaws, NOT
+                            # uav_positions[index - 1]. A live Local GUI edit rebuilds
+                            # the whole array mid-run; "index - 1" in the rebuilt array
+                            # may be an entry this loop never actually processed (e.g.
+                            # the live step had already passed it), so it silently
+                            # looked identical to "index" and the UAV's icon never
+                            # redrew even though its real position had changed. Do not
+                            # revert to array-adjacency without re-reading D-003.
+                            moved = last_drawn_positions[uav_id] is not None and (
+                                np.any(np.array(last_drawn_positions[uav_id]) != np.array(uav_position))
+                                or last_drawn_yaws[uav_id] != yaw_angle
+                            )
                             update_required = self.GuiOption and moved
+                            last_drawn_positions[uav_id] = uav_position
+                            last_drawn_yaws[uav_id] = yaw_angle
     
                             if self.GuiOption:
                                 if polygon_exists[uav_id] and update_required:
                                     self.calc.update_fov_polygon(uav_position, field_of_view_size, yaw_angle, polygon_ids[uav_id], border_polygon_ids[uav_id])
-                                if step % 1 == 0 and poi_exists[uav_id] and update_required: ## PERFORMANCE CHECK ##
+                                if poi_exists[uav_id] and update_required:
                                     self.calc.update_poi(poi_ids[uav_id], uav_position, yaw_angle)
     
                             if self.UavMode == 'Sampling':
@@ -322,7 +432,8 @@ class UAVSimulation:
     
     def get_user_input(self):
         while not self.stop_flag:
-            uav_id, position_str = get_uav_position_input()
+            current_time = self.current_step * self.simulation_step_length
+            uav_id, position_str = get_uav_position_input(current_time)
     
             # Check if the break button was pressed
             if uav_id.strip().lower() == 'break':
@@ -345,21 +456,47 @@ class UAVSimulation:
 
     def update_uav_path(self, uav_id, details):
         # Here I ignore one waypoint after the new entry
-        
+
         time, x, y, z, yaw_angle = details
-    
+
+        # DECISION plan-2026-10-07T075432-0e92718c/D-004: clamp a stale/past
+        # start time up to "right now" (read fresh here, at apply-time - not
+        # whatever time the popup captured when it opened). A human takes
+        # several real seconds to fill in the popup; without this clamp, the
+        # scheduled rotate+move+rotate maneuver is often already entirely in
+        # the past by the time this runs, so the main loop (which only
+        # checks the live, ever-advancing step - see run_simulation's
+        # "if step in times") skips every intermediate frame and the UAV
+        # appears to teleport straight to the target instead of flying
+        # there. Do not remove this without re-reading D-004 - an explicit
+        # *future* time the user actually typed is left untouched; only a
+        # time that has already fallen behind "now" gets bumped forward.
+        live_time_now = self.current_step * self.simulation_step_length
+        if time < live_time_now:
+            time = live_time_now
+
         # Check if local GUI is true and modify the path accordingly
         if self.local_gui:
             if str(uav_id) in self.uav_data:
-                # Find the index of the next waypoint to be executed
-                next_index = next((idx for idx, point in enumerate(self.uav_data[str(uav_id)]) if point[0] > time), None)
-                
+                waypoints = self.uav_data[str(uav_id)]
+
+                # Find the index of the next waypoint to be executed. If the
+                # new waypoint's time is at or after every existing one (the
+                # common case - you're usually scheduling something for
+                # "now" or soon), there is no such waypoint; insert at the
+                # end instead of leaving next_index as None, which list.insert
+                # can't use as a position.
+                next_index = next(
+                    (idx for idx, point in enumerate(waypoints) if point[0] > time),
+                    len(waypoints)
+                )
+
                 # Insert the new waypoint
-                self.uav_data[str(uav_id)].insert(next_index, [time, x, y, z, yaw_angle])
-                
-                # Remove the next waypoint in the sequence
-                if next_index is not None and len(self.uav_data[str(uav_id)]) > next_index + 1:
-                    self.uav_data[str(uav_id)].pop(next_index + 1)
+                waypoints.insert(next_index, [time, x, y, z, yaw_angle])
+
+                # Remove the next waypoint in the sequence, if there was one
+                if len(waypoints) > next_index + 1:
+                    waypoints.pop(next_index + 1)
     
         # Otherwise, proceed as before
         else:
@@ -435,31 +572,34 @@ class UAVSimulation:
                             uav_yaw_angles.append(current_yaw_angle)  # Keep the same yaw while changing height
                             total_steps += 1                        
                         
+                        target_delta = self.calc.normalize_yaw_difference(target_yaw_angle - current_yaw_angle)
                         for step in range(rotate_to_target_steps):
-                            yaw = current_yaw_angle + (target_yaw_angle - current_yaw_angle) * (step + 1) / rotate_to_target_steps
+                            yaw = current_yaw_angle + target_delta * (step + 1) / rotate_to_target_steps
                             uav_positions.append(next_pos)
                             step_times.append(total_steps)
                             uav_yaw_angles.append(yaw)
                             total_steps += 1
-                            
+
                     else:
+                        move_delta = self.calc.normalize_yaw_difference(move_yaw_angle - current_yaw_angle)
                         for step in range(rotate_to_move_steps):
-                            yaw = current_yaw_angle + (move_yaw_angle - current_yaw_angle) * (step + 1) / rotate_to_move_steps
+                            yaw = current_yaw_angle + move_delta * (step + 1) / rotate_to_move_steps
                             uav_positions.append(init_pos)
                             step_times.append(total_steps)
                             uav_yaw_angles.append(yaw)
                             total_steps += 1
-        
+
                         for step in range(move_steps):
                             position = init_pos + (next_pos - init_pos) * (step + 1) / move_steps
                             uav_positions.append(position)
                             step_times.append(total_steps)
                             uav_yaw_angles.append(move_yaw_angle) # uav_yaw_angles.append(current_yaw_angle)
                             total_steps += 1
-        
+
                         if self.UavMode != 'Spinning':
+                            target_delta = self.calc.normalize_yaw_difference(target_yaw_angle - move_yaw_angle)
                             for step in range(rotate_to_target_steps):
-                                yaw = move_yaw_angle + (target_yaw_angle - move_yaw_angle) * (step + 1) / rotate_to_target_steps
+                                yaw = move_yaw_angle + target_delta * (step + 1) / rotate_to_target_steps
                                 uav_positions.append(next_pos)
                                 step_times.append(total_steps)
                                 uav_yaw_angles.append(yaw)
@@ -492,6 +632,9 @@ def start_simulation_thread(sim, tk_root):
         sim.run_simulation()
     except traci.exceptions.FatalTraCIError:
         print("Simulation terminated due to SUMO closing.")
+    except FileNotFoundError:
+        print("Could not start SUMO: 'sumo'/'sumo-gui' was not found on PATH. "
+              "Make sure SUMO is installed and SUMO_HOME/bin is on PATH.")
     finally:
         try:
             traci.close()
@@ -506,7 +649,11 @@ if __name__ == "__main__":
     root.withdraw()  # Hide the main window since we don't need it
 
     # Initialize the simulation
-    sim = UAVSimulation('config.json')
+    try:
+        sim = UAVSimulation('config.json')
+    except ConfigError as e:
+        print(f"Configuration error: {e}")
+        sys.exit(1)
 
     # Start the simulation in a separate thread so it doesn't block the Tkinter event loop
     simulation_thread = threading.Thread(target=start_simulation_thread, args=(sim, root))

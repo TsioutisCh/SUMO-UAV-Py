@@ -101,7 +101,6 @@ def load_uav_config(config_file):
         'battery_mode': config.get('Battery Mode', False),
         'num_UAVs': num_uavs,
         'UavMode': config.get('Uav Mode', 'Hovering'),
-        'mode': config.get('Input Mode', 'Offline'),
         'movement': config.get('Movement', 'Continuous'),
         'server_option': server_option,
         'local_gui': config.get('Local GUI', False),

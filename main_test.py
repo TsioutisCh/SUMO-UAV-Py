@@ -52,7 +52,6 @@ class UAVSimulation:
         self.battery_mode = cfg['battery_mode']
         self.num_UAVs = cfg['num_UAVs']
         self.UavMode = cfg['UavMode']
-        self.mode = cfg['mode']
         self.movement = cfg['movement']
         self.server_option = cfg['server_option']
         self.local_gui = cfg['local_gui']
@@ -153,31 +152,38 @@ class UAVSimulation:
                             uav_yaw_angles.append(current_yaw_angle)  # Keep the same yaw while changing height
                             total_steps += 1                        
                         
+                        target_delta = self.calc.normalize_yaw_difference(target_yaw_angle - current_yaw_angle)
                         for step in range(rotate_to_target_steps):
-                            yaw = current_yaw_angle + (target_yaw_angle - current_yaw_angle) * (step + 1) / rotate_to_target_steps
-                            uav_positions.append(init_pos)
+                            # DECISION plan-2026-10-07T075432-0e92718c/D-001: append next_pos, not init_pos.
+                            # The move loop just above already relocated the UAV to next_pos; this loop only
+                            # rotates its yaw in place. Appending init_pos here silently snapped logged
+                            # positions back to the start of the move (see tests/test_path_parity.py).
+                            yaw = current_yaw_angle + target_delta * (step + 1) / rotate_to_target_steps
+                            uav_positions.append(next_pos)
                             step_times.append(total_steps)
                             uav_yaw_angles.append(yaw)
                             total_steps += 1
-                            
+
                     else:
+                        move_delta = self.calc.normalize_yaw_difference(move_yaw_angle - current_yaw_angle)
                         for step in range(rotate_to_move_steps):
-                            yaw = current_yaw_angle + (move_yaw_angle - current_yaw_angle) * (step + 1) / rotate_to_move_steps
+                            yaw = current_yaw_angle + move_delta * (step + 1) / rotate_to_move_steps
                             uav_positions.append(init_pos)
                             step_times.append(total_steps)
                             uav_yaw_angles.append(yaw)
                             total_steps += 1
-        
+
                         for step in range(move_steps):
                             position = init_pos + (next_pos - init_pos) * (step + 1) / move_steps
                             uav_positions.append(position)
                             step_times.append(total_steps)
                             uav_yaw_angles.append(move_yaw_angle) # uav_yaw_angles.append(current_yaw_angle)
                             total_steps += 1
-        
+
                         if self.UavMode != 'Spinning':
+                            target_delta = self.calc.normalize_yaw_difference(target_yaw_angle - move_yaw_angle)
                             for step in range(rotate_to_target_steps):
-                                yaw = move_yaw_angle + (target_yaw_angle - move_yaw_angle) * (step + 1) / rotate_to_target_steps
+                                yaw = move_yaw_angle + target_delta * (step + 1) / rotate_to_target_steps
                                 uav_positions.append(next_pos)
                                 step_times.append(total_steps)
                                 uav_yaw_angles.append(yaw)
