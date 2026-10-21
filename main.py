@@ -263,7 +263,14 @@ class UAVSimulation:
         battery_life_steps = {str(uav_id): max(0, self.uav_data[str(uav_id)][0][0]) for uav_id in range(self.num_UAVs)}
         polygon_exists = {i: False for i in range(self.num_UAVs)}
         poi_exists = {i: False for i in range(self.num_UAVs)}
-        
+        # Last position/yaw actually processed for each UAV, tracked
+        # separately from array adjacency - see the "moved" check below for
+        # why: a live Local GUI edit rebuilds uav_positions_list mid-run, so
+        # "index - 1" in the freshly rebuilt array no longer means "the
+        # previous frame we actually drew."
+        last_drawn_positions = {i: None for i in range(self.num_UAVs)}
+        last_drawn_yaws = {i: None for i in range(self.num_UAVs)}
+
         with open(output_file, mode='w', newline='') as file:
             writer = csv.writer(file, delimiter=',')
             writer.writerow(['Step', 'Seconds', 'UAV_ID', 'UAV_X', 'UAV_Y', 'UAV_Z', 'Yaw', 'VehicleID', 'X', 'Y', 'Speed'])
@@ -327,9 +334,22 @@ class UAVSimulation:
                             field_of_view_size = self.calc.fov_calculation(self.fov_degrees, uav_position[2])
                             
                             
-                            # reduce the long if statements.
-                            moved = index > 0 and (np.any(np.array(uav_positions[index - 1]) != np.array(uav_position)) or uav_yaw_angles[index - 1] != yaw_angle)
+                            # DECISION plan-2026-10-07T075432-0e92718c/D-003: compare
+                            # against last_drawn_positions/last_drawn_yaws, NOT
+                            # uav_positions[index - 1]. A live Local GUI edit rebuilds
+                            # the whole array mid-run; "index - 1" in the rebuilt array
+                            # may be an entry this loop never actually processed (e.g.
+                            # the live step had already passed it), so it silently
+                            # looked identical to "index" and the UAV's icon never
+                            # redrew even though its real position had changed. Do not
+                            # revert to array-adjacency without re-reading D-003.
+                            moved = last_drawn_positions[uav_id] is not None and (
+                                np.any(np.array(last_drawn_positions[uav_id]) != np.array(uav_position))
+                                or last_drawn_yaws[uav_id] != yaw_angle
+                            )
                             update_required = self.GuiOption and moved
+                            last_drawn_positions[uav_id] = uav_position
+                            last_drawn_yaws[uav_id] = yaw_angle
     
                             if self.GuiOption:
                                 if polygon_exists[uav_id] and update_required:
