@@ -25,6 +25,7 @@
 - Multiple UAV flight behaviors: `Hovering`, `Sampling`, `Spinning`
 - 3D trajectory simulation using 5D waypoints (time, x, y, z, yaw)
 - Manual or script-based UAV paths
+- Visual Flight Plan editor: map + waypoint table for planning and previewing each UAV's path before a run
 - Battery constraints (optional)
 - GUI-based or JSON-based configuration
 - Modular architecture for integration with external planners
@@ -91,6 +92,8 @@ SUMO-UAV-Py/
 ├── main.py                   # Headless/GUI-overlay simulation runner
 ├── main_test.py               # Post-processing benchmark runner (works from a SUMO fcd-output file)
 ├── uavpy_gui.py               # Tkinter GUI for editing config.json and launching main.py
+├── flight_plan_editor.py      # Map + table editor for planning/previewing UAV waypoints
+├── network_geometry.py        # Parses a SUMO .net.xml into a map backdrop for flight_plan_editor.py
 ├── client.py                  # Example TCP client for "Remote Server" mode
 ├── uav_gui_run.bat            # Windows launcher for uavpy_gui.py
 ├── uav_run.bat                # Windows launcher for main.py
@@ -107,6 +110,7 @@ SUMO-UAV-Py/
 │   ├── manual.png / manualLQ.png
 │   ├── mini3pro.png / mini3proLQ.png
 │   ├── mavic2e.png / mavic2eLQ.png
+│   ├── flight_plan_editor.png
 │   └── kiosLogo.ico / kiosLogo.png
 │
 └── README.md
@@ -131,6 +135,19 @@ python main.py
 ```
 
 Windows users can instead double-click `uav_gui_run.bat` / `uav_run.bat`.
+
+## 🗺️ Flight Plan Editor
+
+Click **"Flight Plan..."** in the GUI to open a combined map + table editor for each UAV's waypoint schedule, instead of hand-editing `uav_data` in `config.json`:
+
+- A map of the loaded SUMO network with every UAV's planned flight path drawn on top, the currently-selected UAV highlighted.
+- A per-UAV table of waypoints (`time`, `x`, `y`, `z`, `yaw`) — add, edit, or delete rows directly.
+- Set a waypoint's position by pasting X,Y copied from sumo-gui's right-click "Copy cursor position" menu, or by clicking directly on the map.
+- The preview updates live as you edit — no SUMO instance needs to be running, and `config.json` isn't touched until you click **Apply**.
+
+<p align="center">
+  <img src="images/flight_plan_editor.png" alt="Flight Plan Editor screenshot" width="800">
+</p>
 
 ## 📌 Notes
 
