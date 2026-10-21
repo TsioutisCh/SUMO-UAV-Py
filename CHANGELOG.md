@@ -6,6 +6,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- "Flight Plan..." button in `uavpy_gui.py`, opening a combined map + table editor for each UAV's waypoint schedule: a matplotlib view of the SUMO network outline with every UAV's planned path drawn as a line and the selected UAV's waypoints marked and labeled with their times, alongside a table (add/edit/delete rows of time/x/y/z/yaw) for the selected UAV. Row editing reuses the existing "paste X,Y from clipboard" pattern from the live in-run popup, plus a new "set X,Y from map click" option. Edits only land in the live config once "Apply" is clicked, same as every other field in the form; the preview recomputes each UAV's path via a scratch config file and the real simulation code, so it never requires SUMO to be running. Replaces the previous total absence of any pre-run UI for the waypoint schedule (`uav_data` is a dict, which the form's existing field-generation silently skipped).
+
 ### Changed
 - Renamed `main_.py` → `main.py`, `_utils.py` → `utils.py`, `client_.py` → `client.py` for standard Python naming; updated all imports and script references accordingly.
 - `main_test.py` now reuses `utils.Calculations` instead of carrying its own duplicate copies of the FOV/kinematics math.
