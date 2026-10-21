@@ -30,9 +30,12 @@ _cache = {}  # path -> (mtime, NetworkGeometry)
 
 def _parse_shape(shape_attr):
     points = []
-    for pair in shape_attr.split():
-        x_str, y_str = pair.split(',')
-        points.append((float(x_str), float(y_str)))
+    try:
+        for pair in shape_attr.split():
+            x_str, y_str = pair.split(',')
+            points.append((float(x_str), float(y_str)))
+    except ValueError as e:
+        raise NetworkGeometryError(f"Malformed shape attribute {shape_attr!r}: {e}")
     return points
 
 
@@ -41,9 +44,10 @@ def parse_network_geometry(path):
 
     Cached by (path, mtime): a second call for an unchanged file returns the
     same NetworkGeometry object; a call after the file's mtime changes
-    reparses it. Raises NetworkGeometryError for a missing/malformed file or
-    one with no <location convBoundary=...> tag, rather than letting a raw
-    OSError/ParseError surface.
+    reparses it. Raises NetworkGeometryError for a missing/malformed file,
+    one with no <location convBoundary=...> tag, or one with malformed
+    numeric attributes (convBoundary, lane shape coordinates) - rather than
+    letting a raw OSError/ParseError/ValueError surface.
     """
     if not os.path.exists(path):
         raise NetworkGeometryError(f"Network file {path} not found.")
@@ -65,9 +69,14 @@ def parse_network_geometry(path):
             f"Network file {path} has no <location convBoundary=...> tag."
         )
 
-    min_x, min_y, max_x, max_y = (
-        float(v) for v in location.attrib['convBoundary'].split(',')
-    )
+    try:
+        min_x, min_y, max_x, max_y = (
+            float(v) for v in location.attrib['convBoundary'].split(',')
+        )
+    except ValueError as e:
+        raise NetworkGeometryError(
+            f"Network file {path} has a malformed convBoundary attribute: {e}"
+        )
 
     segments = []
     for edge in root.iter('edge'):

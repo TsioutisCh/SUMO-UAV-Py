@@ -62,6 +62,28 @@ class TestParseNetworkGeometry:
         with pytest.raises(NetworkGeometryError):
             parse_network_geometry(str(no_location_path))
 
+    def test_malformed_conv_boundary_raises_network_geometry_error(self, tmp_path):
+        # Well-formed XML, but convBoundary has 3 values instead of 4 - a
+        # raw ValueError from tuple-unpacking must not escape uncaught.
+        bad_path = tmp_path / 'bad_boundary.net.xml'
+        bad_path.write_text(
+            '<net><location convBoundary="0,0,100"/>'
+            '<edge id="1"><lane id="1_0" shape="0,0 1,1"/></edge></net>'
+        )
+        with pytest.raises(NetworkGeometryError):
+            parse_network_geometry(str(bad_path))
+
+    def test_malformed_lane_shape_raises_network_geometry_error(self, tmp_path):
+        # A shape token with no comma - a raw ValueError from pair.split(',')
+        # unpacking must not escape uncaught.
+        bad_path = tmp_path / 'bad_shape.net.xml'
+        bad_path.write_text(
+            '<net><location convBoundary="0,0,100,100"/>'
+            '<edge id="1"><lane id="1_0" shape="not-a-coordinate 1,1"/></edge></net>'
+        )
+        with pytest.raises(NetworkGeometryError):
+            parse_network_geometry(str(bad_path))
+
     def test_parses_minimal_network_correctly(self, tmp_path):
         net_path = tmp_path / 'minimal.net.xml'
         net_path.write_text(MINIMAL_NET_XML)
