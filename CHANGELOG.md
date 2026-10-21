@@ -48,3 +48,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Dead `self.mode`/`'Input Mode'` config field (superseded by `'Movement'`, grep-confirmed to have zero readers) from `config.py`, `main.py`, and `main_test.py`.
 - A no-op guard in `main.py` (`if step % 1 == 0 and ...`) that was always true and never throttled anything despite looking like a performance check.
 - `utils.py`'s commented-out old `calculate_rotate_steps_` implementation, superseded by the live version right below it.
+
+### Fixed
+- The UAV's icon in sumo-gui never visibly moved after submitting a new position through the Local GUI popup, even though the underlying waypoint data was updated correctly. `run_simulation()` decided whether to redraw by comparing adjacent entries in the flight-path array, but a live edit rebuilds that array from scratch mid-run — by the time a human has filled in the popup and clicked Submit, the live simulation step has usually already passed the whole newly-computed maneuver, so the comparison silently landed on two identical "already arrived" entries and never triggered a redraw. Pre-existing bug; now tracks each UAV's last-drawn position/yaw directly instead of relying on array adjacency.
